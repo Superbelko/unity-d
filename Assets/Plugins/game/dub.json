@@ -1,0 +1,20 @@
+{
+	"authors": [
+		"evilr"
+	],
+	"copyright": "Copyright © 2019, evilr",
+	"description": "A minimal D application.",
+	"license": "proprietary",
+	"dependencies": {
+		
+	},
+	"dflags": [
+		"-mixin=generated.d"
+	],
+	"name": "dtest",
+	"configurations": [
+		{ "name": "sharedlib", "targetType": "dynamicLibrary" },
+		{ "name": "app", "targetType": "executable", "versions": ["app_target"] },
+		{ "name": "emitwrapper", "targetType": "executable", "versions": ["EmitCSharp"]}
+	]
+}
