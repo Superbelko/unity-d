@@ -38,6 +38,8 @@ struct MonoGenericParam;
 struct MonoGenericClass;
 struct MonoGenericContext;
 struct MonoImageSet;
+struct MonoEvent;
+struct MonoThread;
 
 alias MonoError = uint;
 
@@ -50,12 +52,18 @@ static:
 
 
     MonoImage* mono_assembly_get_image(MonoAssembly *assembly);
+    void mono_assembly_close(MonoAssembly* assembly);
 
 
     const(char)* mono_class_get_namespace(MonoClass* klass);
     MonoClass* mono_class_from_name(MonoImage* image, const(char)* name_space, const(char)* name);
     MonoVTable* mono_class_vtable(MonoDomain* domain, MonoClass* klass);
+    MonoClassField* mono_class_get_fields(MonoClass* klass, void** iter);
     MonoMethod* mono_class_get_methods(MonoClass* klass, void** iter);
+    MonoProperty* mono_class_get_properties(MonoClass* klass, void** iter);
+    MonoEvent* mono_class_get_events(MonoClass* klass, void** iter);
+    MonoClass* mono_class_get_interfaces(MonoClass* klass, void** iter);
+    MonoClass* mono_class_get_nested_types(MonoClass* klass, void** iter);
     MonoType* mono_class_get_type(MonoClass* klass);
     MonoProperty* mono_class_get_property_from_name(MonoClass* klass, const(char)* name);
     MonoClassField* mono_class_get_field_from_name(MonoClass* klass, const(char)* name);
@@ -91,6 +99,7 @@ static:
     char* mono_method_get_reflection_name(MonoMethod* method);
     void* mono_method_get_unmanaged_thunk(MonoMethod* method);
     MonoGenericContext* mono_method_get_context(MonoMethod *method); // (INTERNAL) BE AWARE
+    void mono_add_internal_call(const(char)* name, const void* method);
 
     char* mono_field_full_name(MonoClassField* field);
     uint32_t mono_field_get_offset(MonoClassField* field);
@@ -105,6 +114,13 @@ static:
     MonoObject* mono_property_get_value(MonoProperty* prop, void* obj, void** params, MonoObject** exc);
     MonoMethod* mono_property_get_set_method(MonoProperty* prop);
     MonoMethod* mono_property_get_get_method(MonoProperty* prop);
+
+    const(char)* mono_event_get_name(MonoEvent* event);
+    MonoMethod* mono_event_get_add_method(MonoEvent* event);
+    MonoMethod* mono_event_get_remove_method(MonoEvent* event);
+    MonoMethod* mono_event_get_raise_method(MonoEvent* event);
+    MonoClass* mono_event_get_parent(MonoEvent* event);
+    uint32_t mono_event_get_flags(MonoEvent* event);
 
 
     uint32_t mono_signature_get_param_count(MonoMethodSignature* sig);
@@ -128,6 +144,27 @@ static:
     MonoObject* mono_runtime_invoke(MonoMethod* method, void* obj, void** params, MonoObject** exc);
     MonoObject* mono_runtime_delegate_invoke(MonoObject* delegate_, void **params, MonoObject **exc);
     MonoArray* mono_runtime_get_main_args();
+
+
+    MonoArray* mono_array_new(MonoDomain* domain, MonoClass* eclass, uintptr_t n);
+    MonoArray* mono_array_new_full(MonoDomain* domain, MonoClass* array_class, uintptr_t* lengths, intptr_t* lower_bounds);
+    MonoArray* mono_array_new_specific(MonoVTable* vtable, uintptr_t n);
+    MonoArray* mono_array_clone(MonoArray* array);
+    char* mono_array_addr_with_size(MonoArray* array, int size, uintptr_t idx);
+    uintptr_t mono_array_length(MonoArray* array);
+
+
+    MonoThread* mono_thread_current();
+    void mono_thread_set_main(MonoThread* thread);
+    MonoThread* mono_thread_get_main();
+    void mono_thread_stop(MonoThread* thread);
+    void mono_thread_new_init(intptr_t tid, void* stack_start, void* func);
+    void mono_thread_create(MonoDomain* domain, void* func, void* arg);
+    MonoThread* mono_thread_attach(MonoDomain* domain);
+    void mono_thread_detach(MonoThread* thread);
+    void mono_thread_exit();
+    char* mono_thread_get_name_utf8(MonoThread* thread);
+    int32_t mono_thread_get_managed_id(MonoThread* thread);
 
     
     MonoImage* mono_get_corlib();
@@ -169,6 +206,7 @@ static:
 
     char* mono_exception_get_managed_backtrace(MonoException* exc); // internal
 
+    MonoGenericInst* mono_metadata_get_generic_inst(int type_argc, MonoType** type_argv); // internal
 
     ushort mono_error_get_error_code(MonoError* error);
     const(char)* mono_error_get_message(MonoError* error);
@@ -185,6 +223,7 @@ MonoDomain* function()  mono_domain_get;
 MonoAssembly* function(MonoDomain *domain, const(char)* name)  mono_domain_assembly_open;
 
 MonoImage* function(MonoAssembly *assembly)  mono_assembly_get_image;
+void function(MonoAssembly* assembly)  mono_assembly_close;
 
 const(char)* function(MonoClass* klass)  mono_class_get_namespace;
 MonoClass* function(MonoImage *image, const(char)* name_space, const(char)* name)  mono_class_from_name;
@@ -219,6 +258,7 @@ char* function(MonoMethod* method, bool signature)  mono_method_full_name;
 char* function(MonoMethod* method)  mono_method_get_reflection_name;
 void* function(MonoMethod* method)  mono_method_get_unmanaged_thunk;
 MonoGenericContext* function(MonoMethod* method)  mono_method_get_context;
+void function(const(char)* name, const void* method)  mono_add_internal_call;
 
 char* function(MonoClassField* field)  mono_field_full_name;
 uint32_t function(MonoClassField* field)  mono_field_get_offset;
@@ -233,6 +273,13 @@ void function(MonoProperty* prop, void* obj, void** params, MonoObject** exc)  m
 MonoObject* function(MonoProperty* prop, void* obj, void** params, MonoObject** exc)   mono_property_get_value;
 MonoMethod* function(MonoProperty* prop)  mono_property_get_set_method;
 MonoMethod* function(MonoProperty* prop)  mono_property_get_get_method;
+
+const(char)* function(MonoEvent* event)  mono_event_get_name;
+MonoMethod* function(MonoEvent* event)  mono_event_get_add_method;
+MonoMethod* function(MonoEvent* event)  mono_event_get_remove_method;
+MonoMethod* function(MonoEvent* event)  mono_event_get_raise_method;
+MonoClass* function(MonoEvent* event)  mono_event_get_parent;
+uint32_t function(MonoEvent* event)  mono_event_get_flags;
 
 uint32_t function(MonoMethodSignature* sig)  mono_signature_get_param_count;
 char* function(MonoMethodSignature* sig, bool include_namespace)  mono_signature_get_desc;
@@ -254,6 +301,25 @@ int function(MonoString *s) mono_string_length;
 MonoObject* function(MonoMethod* method, void* obj, void** params, MonoObject** exc)  mono_runtime_invoke;
 MonoObject* function(MonoObject* delegate_, void **params, MonoObject **exc)  mono_runtime_delegate_invoke;
 MonoArray* function()  mono_runtime_get_main_args;
+
+MonoArray* function(MonoDomain* domain, MonoClass* eclass, uintptr_t n)  mono_array_new;
+MonoArray* function(MonoDomain* domain, MonoClass* array_class, uintptr_t* lengths, intptr_t* lower_bounds)  mono_array_new_full;
+MonoArray* function(MonoVTable* vtable, uintptr_t n)  mono_array_new_specific;
+MonoArray* function(MonoArray* array)  mono_array_clone;
+char* function(MonoArray* array, int size, uintptr_t idx)  mono_array_addr_with_size;
+uintptr_t function(MonoArray* array)  mono_array_length;
+
+MonoThread* function()  mono_thread_current;
+void function(MonoThread* thread)  mono_thread_set_main;
+MonoThread* function()  mono_thread_get_main;
+void function(MonoThread* thread)  mono_thread_stop;
+void function(intptr_t tid, void* stack_start, void* func)  mono_thread_new_init;
+void function(MonoDomain* domain, void* func, void* arg)  mono_thread_create;
+MonoThread* function(MonoDomain* domain)  mono_thread_attach;
+void function(MonoThread* thread)  mono_thread_detach;
+void function()  mono_thread_exit;
+char* function(MonoThread* thread)  mono_thread_get_name_utf8;
+int32_t function(MonoThread* thread)  mono_thread_get_managed_id;
 
 MonoImage* function()  mono_get_corlib;
 MonoClass* function()  mono_get_object_class;
@@ -288,6 +354,7 @@ void function(uint32_t gchandle)  mono_gchandle_free;
 
 void function(void*) mono_free;
 
+MonoGenericInst* function(int type_argc, MonoType** type_argv)  mono_metadata_get_generic_inst; // internal
 char* function(MonoException* exc)  mono_exception_get_managed_backtrace;
 ushort function(MonoError* error)  mono_error_get_error_code;
 const(char)* function(MonoError* error)  mono_error_get_message;
