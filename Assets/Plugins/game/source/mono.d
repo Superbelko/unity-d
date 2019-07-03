@@ -802,11 +802,24 @@ ReturnType!Method MonoGenericMethod(alias Class, alias Method, Args...)(MonoObje
     import unity;
     import std.conv;
 
+    static if (getUDAs!(Class, AssemblyAttr).length)
+        enum src_assemblyName = getUDAs!(Class, AssemblyAttr)[0].name;
+    else
+        enum src_assemblyName = "UnityEngine";
+    static if (getUDAs!(Class, NamespaceAttr).length)
+        enum src_nsName = getUDAs!(Class, NamespaceAttr)[0].name;
+    else 
+        enum src_nsName = "";
+    static if (getUDAs!(Class, SymNameAttr).length)
+        enum src_clsName = getUDAs!(Class, SymNameAttr)[0].name;
+    else
+        enum src_clsName = __traits(identifier, Class);
+
     MonoObject* res;
     MonoObject* exc;
     auto dom = MonoDomainHandle._default.get();
-    MonoAssemblyHandle ass = dom.openAssembly("UnityEngine");
-    auto cls = ass.image.classFromName("UnityEngine", __traits(identifier, Class) ==  "Object_" ? "Object" : __traits(identifier, Class));
+    MonoAssemblyHandle ass = dom.openAssembly(src_assemblyName);
+    auto cls = ass.image.classFromName(src_nsName, __traits(identifier, Class) ==  "Object_" ? "Object" : src_clsName);
     auto genericmeth = mono_class_get_method_from_name(cls.handle, toStringz(__traits(identifier, Method)), Parameters!Method.length);
 
     //m.call(boxify(instantiate ? "yay" : "nay"));
@@ -826,11 +839,29 @@ ReturnType!Method MonoGenericMethod(alias Class, alias Method, Args...)(MonoObje
         MonoType*[Args.length] argtypes;
         static foreach(i, arg; Args)
         {
-            argtypes[i] = mono_class_get_type(ass.image.classFromName("UnityEngine", arg.stringof).handle);
+            // this will likely complain when more than one argument provided as it adds to the scope
+            enum assemblyName = getUDAs!(arg, AssemblyAttr)[0].name;
+            static if (getUDAs!(arg, NamespaceAttr).length)
+                enum nsName = getUDAs!(arg, NamespaceAttr)[0].name;
+            else 
+                enum nsName = "";
+            static if (getUDAs!(arg, SymNameAttr).length)
+                enum clsName = getUDAs!(arg, SymNameAttr)[0].name;
+            else
+                enum clsName = arg.stringof;
+            MonoAssemblyHandle assArg = dom.openAssembly(assemblyName);
+            auto clsArg = assArg.image.classFromName(nsName, __traits(identifier, Class) ==  "Object_" ? "Object" : clsName);
+            argtypes[i] = mono_class_get_type(clsArg.handle);
+            //scope(exit) mono_assembly_close(assArg._assembly);
         }
 
         // Do not touch argtypes! Read comment about type_args in mono_internal
-        auto gi = new _MonoGenericInst();
+        //auto gi = new _MonoGenericInst(); 
+        // do not use GC, it seems mono internally tries to free the memory later on leading to crash on DLL reload/exit
+        // crash relates to mempool_free* function, which is referenced in free_generic_inst()
+        // it is also possible that we are supposed to use mono_metadata_get_generic_inst() instead 
+        import core.stdc.stdlib;
+        auto gi = cast(_MonoGenericInst*) malloc(_MonoGenericInst.sizeof);
         gi.id = -1;
         gi.is_open = 0;
         gi.type_argc = Args.length;
@@ -843,7 +874,6 @@ ReturnType!Method MonoGenericMethod(alias Class, alias Method, Args...)(MonoObje
     }
 
     
-    Debug.Log(res);
 
     if (exc)
         throw new MonoException(exc);
