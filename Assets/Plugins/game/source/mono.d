@@ -990,6 +990,26 @@ mixin template MonoMember(T, string name)
 
 }
 
+// return System.Type equivalent for specific type
+MonoReflectionType* getSystemType(Class)()
+{
+    enum assemblyName = getUDAs!(Class, AssemblyAttr)[0].name;
+    static if (getUDAs!(Class, NamespaceAttr).length)
+        enum nsName = getUDAs!(Class, NamespaceAttr)[0].name;
+    else 
+        enum nsName = "";
+    static if (getUDAs!(Class, SymNameAttr).length)
+        enum clsName = getUDAs!(Class, SymNameAttr)[0].name;
+    else
+        enum clsName = __traits(identifier, Class);
+
+    auto dom = MonoDomainHandle._default.get();
+    MonoAssemblyHandle ass = dom.openAssembly(assemblyName);
+    auto cls = ass.image.classFromName(nsName, clsName);
+    auto ty = mono_class_get_type(cls.handle);
+    return mono_type_get_object(dom.handle, ty);
+}
+
 version(none) unittest
 {
     struct Test
