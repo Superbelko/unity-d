@@ -774,13 +774,16 @@ string monoGenericMethod(Args...)()
 
     str ~= "import std.traits;\n";
     str ~= "import mono;\n";
+    static foreach(arg; Args) 
+     static if (__traits(compiles, moduleName!arg))
+      str ~= "import " ~ moduleName!arg ~ ";\n";
     str ~= "bool __anchor__;\n";
     str ~= "alias tmpl = __traits(parent, __anchor__);\n";
     str ~= "alias fn = tmpl!" ~ Args.stringof ~ ";";
 
     str ~= "enum fname = __traits(identifier, fn);\n";
     str ~= q{
-        alias impl = MonoGenericMethod!(__traits(parent, tmpl), fn, TemplateArgsOf!fn);
+        alias __impl = MonoGenericMethod!(__traits(parent, tmpl), fn, TemplateArgsOf!fn);
 
         static if (__traits(isStaticFunction, fn))
           enum self = null;
@@ -788,9 +791,9 @@ string monoGenericMethod(Args...)()
           alias self = _obj;
 
         static if (is(typeof(return) == void))
-            impl(self, ParameterIdentifierTuple!fn);
+            __impl(self, ParameterIdentifierTuple!fn);
         else
-            return impl(self, ParameterIdentifierTuple!fn);
+            return __impl(self, ParameterIdentifierTuple!fn);
     };
     return str;
 }
