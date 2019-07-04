@@ -83,6 +83,7 @@ static:
     MonoClass* mono_object_get_class(MonoObject* obj);
     void* mono_object_unbox(MonoObject* obj);
     MonoMethod* mono_object_get_virtual_method(MonoObject* obj, MonoMethod* method);
+    uint mono_object_get_size(MonoObject* o);
 
 
 
@@ -244,6 +245,7 @@ MonoDomain* function(MonoObject* obj)  mono_object_get_domain;
 MonoClass* function(MonoObject* obj)  mono_object_get_class;
 void* function(MonoObject* obj)  mono_object_unbox;
 MonoMethod* function(MonoObject* obj, MonoMethod* method)  mono_object_get_virtual_method;
+uint function(MonoObject* o)  mono_object_get_size;
 
 MonoMethod* function(MonoImage* image, uint32_t token, MonoClass* klass)  mono_get_method;
 MonoMethodSignature* function(MonoMethod* method, MonoImage* image, uint32_t token)  mono_method_get_signature;
@@ -665,9 +667,13 @@ mixin template Fun(T, alias fn, string suffix = null)
     mixin(
         __traits(identifier, fn) == "__ctor" ? "this " : text(`final`, __traits(isStaticFunction, fn) ? " static " : " override ", `ReturnType!fn `, __traits(identifier, fn)), suffix, `(Parameters!fn)`,
         q{{
-                string namespace = getUDAs!(__traits(parent, fn), NamespaceAttr)[0].name;
+                static if (getUDAs!(__traits(parent, fn), AssemblyAttr).length)
+                  enum assembly = getUDAs!(__traits(parent, fn), AssemblyAttr)[0].name;
+                else
+                  enum assembly = "UnityEngine";
+                enum namespace = getUDAs!(__traits(parent, fn), NamespaceAttr)[0].name;
                 auto dom = MonoDomainHandle.get();
-                auto ass = dom.openAssembly(namespace);
+                auto ass = dom.openAssembly(assembly);
                 MonoClassHandle cls = ass.image.classFromName(namespace, __traits(identifier, __traits(parent, fn)) == "Object_" ? "Object" : __traits(identifier, __traits(parent, fn)) );
                 static if (staticIndexOf!("@property", __traits(getFunctionAttributes, FunctionTypeOf!(fn))) >= 0)
                   static if (Parameters!(FunctionTypeOf!fn).length == 1)
@@ -843,7 +849,10 @@ ReturnType!Method MonoGenericMethod(alias Class, alias Method, Args...)(MonoObje
         static foreach(i, arg; Args)
         {
             // this will likely complain when more than one argument provided as it adds to the scope
-            enum assemblyName = getUDAs!(arg, AssemblyAttr)[0].name;
+            static if (getUDAs!(arg, AssemblyAttr).length)
+                enum assemblyName = getUDAs!(arg, AssemblyAttr)[0].name;
+            else
+                enum assemblyName = "UnityEngine";
             static if (getUDAs!(arg, NamespaceAttr).length)
                 enum nsName = getUDAs!(arg, NamespaceAttr)[0].name;
             else 
@@ -876,14 +885,11 @@ ReturnType!Method MonoGenericMethod(alias Class, alias Method, Args...)(MonoObje
             res = mono_runtime_invoke(inflated, self, args.ptr, &exc);
     }
 
-    
-
     if (exc)
         throw new MonoException(exc);
 
     static if (!is(ReturnType!Method == void))
-        return typeof(return).init;
-        //return monounwrap!(ReturnType!(Method))(res);
+        return monounwrap!(ReturnType!(Method))(res);
 }
 
 T MonoMemberGet(Class, T, string name)(MonoObject* obj)
