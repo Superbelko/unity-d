@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -43,6 +44,15 @@ class NativeLoader : MonoBehaviour
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void PluginShutdown();
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate void PluginFixedTick();
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate void PluginLateTick();
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate void Helper_SceneLoaded();
+
 #if UNITY_STANDALONE_WIN
     public static readonly string pluginExtension = ".dll";
     public static readonly string prefix = "";
@@ -58,6 +68,11 @@ class NativeLoader : MonoBehaviour
     private PluginInit _init;
     private PluginShutdown _shutdown;
     private PluginTick _tick;
+    private PluginFixedTick _fixedTick;
+    private PluginLateTick _lateTick;
+
+    // special helper, won't be called on first load
+    private Helper_SceneLoaded _sceneLoaded;
 
     private GCHandle _objhandle;
 
@@ -65,11 +80,36 @@ class NativeLoader : MonoBehaviour
     {
         LoadPlugin();
         InitPlugin();
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    private void OnSceneLoaded(Scene arg0, LoadSceneMode arg1)
+    {
+        if (_sceneLoaded != null)
+            _sceneLoaded();
     }
 
     private void OnApplicationQuit()
     {
         UnloadPlugin();
+    }
+
+    private void Update()
+    {
+        if (_tick != null)
+            _tick(Time.deltaTime);
+    }
+
+    private void FixedUpdate()
+    {
+        if (_fixedTick != null)
+            _fixedTick();
+    }
+
+    private void LateUpdate()
+    {
+        if (_lateTick != null)
+            _lateTick();
     }
 
     private void InitPlugin()
@@ -94,6 +134,18 @@ class NativeLoader : MonoBehaviour
         IntPtr tickFun = Functions.GetProcAddress(libHandle, nameof(PluginTick));
         if (tickFun != IntPtr.Zero)
             _tick = (PluginTick)Marshal.GetDelegateForFunctionPointer(tickFun, typeof(PluginTick));
+
+        IntPtr fixedTickFun = Functions.GetProcAddress(libHandle, nameof(PluginFixedTick));
+        if (fixedTickFun != IntPtr.Zero)
+            _fixedTick = (PluginFixedTick)Marshal.GetDelegateForFunctionPointer(fixedTickFun, typeof(PluginFixedTick));
+
+        IntPtr lateTickFun = Functions.GetProcAddress(libHandle, nameof(PluginLateTick));
+        if (lateTickFun != IntPtr.Zero)
+            _lateTick = (PluginLateTick)Marshal.GetDelegateForFunctionPointer(lateTickFun, typeof(PluginLateTick));
+
+        IntPtr sceneLoadedFun = Functions.GetProcAddress(libHandle, nameof(Helper_SceneLoaded));
+        if (sceneLoadedFun != IntPtr.Zero)
+            _sceneLoaded = (Helper_SceneLoaded)Marshal.GetDelegateForFunctionPointer(sceneLoadedFun, typeof(Helper_SceneLoaded));
     }
 
     void UnloadPlugin()
@@ -107,6 +159,9 @@ class NativeLoader : MonoBehaviour
             _init = null;
             _shutdown = null;
             _tick = null;
+            _fixedTick = null;
+            _lateTick = null;
+            _sceneLoaded = null;
             while (Functions.FreeLibrary(libHandle))
             {
                 // do nothing, repeat until free library release all references
@@ -145,7 +200,12 @@ public class PluginField
     public string BuildPath(string namePrefix, string extension)
     {
         var sep = System.IO.Path.DirectorySeparatorChar;
-        return $"{pluginPath}{sep}{namePrefix}{pluginName}{extension}";
+#if UNITY_EDITOR 
+        string basePath = pluginPath;
+#else
+        string basePath = $"{Application.dataPath}{sep}Plugins";
+#endif
+        return $"{basePath}{sep}{namePrefix}{pluginName}{extension}";
     }
 }
 
