@@ -60,6 +60,117 @@ enum unityDefaultAssembly = "Assembly-CSharp";
         DontRequireReceiver = 1
     }
 
+    enum PhysicMaterialCombine
+    {
+        Average = 0,
+        Multiply = 1,
+        Minimum = 2,
+        Maximum = 3
+    }
+
+    enum RigidbodyConstraints
+    {
+        None = 0,
+        FreezePositionX = 2,
+        FreezePositionY = 4,
+        FreezePositionZ = 8,
+        FreezePosition = 14,
+        FreezeRotationX = 16,
+        FreezeRotationY = 32,
+        FreezeRotationZ = 64,
+        FreezeRotation = 112,
+        FreezeAll = 126
+    }
+
+    enum CollisionDetectionMode
+    {
+        Discrete = 0,
+        Continuous = 1,
+        ContinuousDynamic = 2,
+        ContinuousSpeculative = 3
+    }
+
+    enum RigidbodyInterpolation
+    {
+        None = 0,
+        Interpolate = 1,
+        Extrapolate = 2
+    }
+
+    enum QueryTriggerInteraction
+    {
+        UseGlobal = 0,
+        Ignore = 1,
+        Collide = 2
+    }
+
+    enum ForceMode
+    {
+        Force = 0,
+        Impulse = 1,
+        VelocityChange = 2,
+        Acceleration = 5
+    }
+
+    enum CameraType
+    {
+        Game = 1,
+        SceneView = 2,
+        Preview = 4,
+        VR = 8,
+        Reflection = 16
+    }
+
+    enum DepthTextureMode
+    {
+        None = 0,
+        Depth = 1,
+        DepthNormals = 2,
+        MotionVectors = 4
+    }
+
+    enum CameraClearFlags
+    {
+        Skybox = 1,
+        Color = 2,
+        SolidColor = 2,
+        Depth = 3,
+        Nothing = 4
+    }
+
+    enum TransparencySortMode
+    {
+        Default = 0,
+        Perspective = 1,
+        Orthographic = 2,
+        CustomAxis = 3
+    }
+
+    enum OpaqueSortMode
+    {
+        Default = 0,
+        FrontToBack = 1,
+        NoDistanceSort = 2
+    }
+
+    enum RenderingPath
+    {
+        UsePlayerSettings = -1,
+        VertexLit = 0,
+        Forward = 1,
+        DeferredLighting = 2,
+        DeferredShading = 3
+    }
+
+    enum StereoTargetEyeMask
+    {
+        None = 0,
+        Left = 1,
+        Right = 2,
+        Both = 3
+    }
+
+
     @symname("Object")
     abstract class Object_
     {
@@ -69,23 +180,23 @@ enum unityDefaultAssembly = "Assembly-CSharp";
         @property void name(string);
         @property HideFlags hideFlags();
         @property void hideFlags(HideFlags);
-        static void Destroy(Object obj);
-        static void Destroy(Object obj, float t);
-        static void DontDestroyOnLoad(Object target);
-        static Object FindObjectOfType(Type type);
+        static void Destroy(Object_ obj);
+        static void Destroy(Object_ obj, float t);
+        static void DontDestroyOnLoad(Object_ target);
+        static Object_ FindObjectOfType(Type type);
         static T FindObjectOfType(T)() { mixin(monoGenericMethod!T); }
         //static T[] FindObjectsOfType(T)();
         //static Object[] FindObjectsOfType(Type type);
-        static Object Instantiate(Object original, Vector3 position, Quaternion rotation, Transform parent);
-        static Object Instantiate(Object original);
-        static Object Instantiate(Object original, Vector3 position, Quaternion rotation);
+        static Object_ Instantiate(Object_ original, Vector3 position, Quaternion rotation, Transform parent);
+        static Object_ Instantiate(Object_ original);
+        static Object_ Instantiate(Object_ original, Vector3 position, Quaternion rotation);
         //static T Instantiate(T)(T original, Transform parent, bool worldPositionStays);
         //static T Instantiate(T)(T original, Transform parent);
         //static T Instantiate(T)(T original, Vector3 position, Quaternion rotation, Transform parent);
         //static T Instantiate(T)(T original, Vector3 position, Quaternion rotation);
         //static T Instantiate(T)(T original);
-        static Object Instantiate(Object original, Transform parent, bool instantiateInWorldSpace);
-        static Object Instantiate(Object original, Transform parent);
+        static Object_ Instantiate(Object_ original, Transform parent, bool instantiateInWorldSpace);
+        static Object_ Instantiate(Object_ original, Transform parent);
         bool Equals(Object other);
         int GetHashCode();
         int GetInstanceID();
@@ -288,7 +399,13 @@ enum unityDefaultAssembly = "Assembly-CSharp";
         @property Component hingeJoint();
         @property Component particleSystem();
 
+        static GameObject Find(string name);
+        static GameObject[] FindGameObjectsWithTag(string tag);
+        static GameObject FindGameObjectWithTag(string tag);
+        static GameObject FindWithTag(string tag);
+        Object_ AddComponent(Type type);
         T AddComponent(T : Component)() { mixin(monoGenericMethod!T); }
+        void SetActive(bool value);
     }
 
 
@@ -312,22 +429,495 @@ enum unityDefaultAssembly = "Assembly-CSharp";
         }
     }
 
+    struct Rect
+    {
+        mixin(monoObjectImpl);
+
+        // internals
+        float m_XMin;
+        float m_YMin;
+        float m_Width;
+        float m_Height;
+
+        @property static Rect zero();
+        @property float x();
+        @property void x(float val);
+        @property float y();
+        @property void y(float val);
+        @property Vector2 position();
+        @property void position(Vector2 val);
+        @property Vector2 center();
+        @property void center(Vector2 val);
+        @property Vector2 min();
+        @property void min(Vector2 val);
+        @property Vector2 max();
+        @property void max(Vector2 val);
+        @property float width();
+        @property void width(float val);
+        @property float height();
+        @property void height(float val);
+        @property Vector2 size();
+        @property void size(Vector2 val);
+        @property float xMin();
+        @property void xMin(float val);
+        @property float yMin();
+        @property void yMin(float val);
+        @property float xMax();
+        @property void xMax(float val);
+        @property float yMax();
+        @property void yMax(float val);
+        @property float left();
+        @property float right();
+        @property float top();
+        @property float bottom();
+
+        static Rect MinMaxRect(float xmin, float ymin, float xmax, float ymax);
+        static Vector2 NormalizedToPoint(Rect rectangle, Vector2 normalizedRectCoordinates);
+        static Vector2 PointToNormalized(Rect rectangle, Vector2 point);
+        bool Contains(Vector3 point, bool allowInverse);
+        bool Contains(Vector3 point);
+        bool Contains(Vector2 point);
+        bool Equals(Rect other);
+        /*override*/ bool Equals(Object other);
+        /*override*/ int GetHashCode();
+        bool Overlaps(Rect other, bool allowInverse);
+        bool Overlaps(Rect other);
+        void Set(float x, float y, float width, float height);
+        /*override*/ string ToString();
+        string ToString(string format);
+    }
+
+    struct Color
+    {
+        mixin(monoObjectImpl);
+
+        float r;
+        float g;
+        float b;
+        float a;
+    }
+
+    struct Vector2
+    {
+        mixin(monoObjectImpl);
+
+        float x, y;
+    }
 
     struct Vector3
     {
+        mixin(monoObjectImpl);
+
         float x, y, z;
+
+        @property static Vector3 zero();
+        @property static Vector3 one();
+        @property static Vector3 forward();
+        @property static Vector3 back();
+        @property static Vector3 right();
+        @property static Vector3 down();
+        @property static Vector3 left();
+        @property static Vector3 positiveInfinity();
+        @property static Vector3 up();
+        @property static Vector3 negativeInfinity();
+        @property static Vector3 fwd();
+        @property float sqrMagnitude();
+        @property Vector3 normalized();
+        @property float magnitude();
+    }
+
+    struct Vector4
+    {
+        mixin(monoObjectImpl);
+
+        float x, y, z, w;
     }
 
 
     struct Matrix4x4
     {
+        mixin(monoObjectImpl);
+
         float[16] m; // these actually are 16 floats named 'm00' to 'm33'
     }
 
 
     struct Quaternion
     {
+        mixin(monoObjectImpl);
+
         float x, y, z, w;
+
+        static Quaternion LookRotation(Vector3 forward);
+        static Quaternion RotateTowards(Quaternion from, Quaternion to, float maxDegreesDelta);
+    }
+
+
+    struct Mathf
+    {
+        mixin(monoObjectImpl);
+
+        static int CeilToInt(float f);
+        static int Clamp(int value, int min, int max);
+        static float Clamp(float value, float min, float max);
+        static float Clamp01(float value);
+        static float Lerp(float a, float b, float t);
+    }
+
+
+    struct Bounds
+    {
+        mixin(monoObjectImpl);
+
+        // internals
+        private Vector3 m_Center;
+        private Vector3 m_Extents;
+
+        //this(Vector3 center, Vector3 size) { m_Center = center; m_Extents = size * 0.5f; }
+
+        @property Vector3 extents();
+        @property void extents(Vector3 val);
+        @property Vector3 size();
+        @property void size(Vector3 val);
+        @property Vector3 center();
+        @property void center(Vector3 val);
+        @property Vector3 min();
+        @property void min(Vector3 val);
+        @property Vector3 max();
+        @property void max(Vector3 val);
+
+        Vector3 ClosestPoint(Vector3 point);
+        bool Contains(Vector3 point);
+        void Encapsulate(Vector3 point);
+        void Encapsulate(Bounds bounds);
+        /*override*/ bool Equals(Object other);
+        bool Equals(Bounds other);
+        void Expand(float amount);
+        void Expand(Vector3 amount);
+        /*override*/ int GetHashCode();
+        bool IntersectRay(Ray ray);
+        bool IntersectRay(Ray ray, out float distance);
+        bool Intersects(Bounds bounds);
+        void SetMinMax(Vector3 min, Vector3 max);
+        float SqrDistance(Vector3 point);
+        string ToString(string format);
+        /*override*/ string ToString();
+    }
+
+
+    struct Ray
+    {
+        mixin(monoObjectImpl);
+
+        // internals
+        Vector3 m_Origin;
+        Vector3 m_Direction;
+
+        //this(Vector3 origin, Vector3 direction);
+
+        @property Vector3 origin();
+        @property void origin(Vector3 val);
+        @property Vector3 direction();
+        @property void direction(Vector3 val);
+
+        Vector3 GetPoint(float distance);
+        string ToString();
+        string ToString(string format);
+    }
+
+    struct RaycastHit
+    {
+        mixin(monoObjectImpl);
+
+        // internals
+        Vector3 m_Point;
+        Vector3 m_Normal;
+        uint m_FaceID;
+        float m_Distance;
+        Vector2 m_UV;
+        int m_Collider;
+
+        @property Collider collider();
+        @property Vector3 point();
+        @property void point(Vector3 val);
+        @property Vector3 normal();
+        @property void normal(Vector3 val);
+        @property Vector3 barycentricCoordinate();
+        @property void barycentricCoordinate(Vector3 val);
+        @property float distance();
+        @property void distance(float val);
+        @property int triangleIndex();
+        @property Vector2 textureCoord();
+        @property Vector2 textureCoord2();
+        @property Vector2 textureCoord1();
+        @property Transform transform();
+        @property Rigidbody rigidbody();
+        @property Vector2 lightmapCoord();
+    }
+
+    abstract class PhysicMaterial : Object_
+    {
+        mixin(monoObjectImpl);
+
+        this(string name);
+
+        @property float bounciness();
+        @property void bounciness(float val);
+        @property float dynamicFriction();
+        @property void dynamicFriction(float val);
+        @property float staticFriction();
+        @property void staticFriction(float val);
+        @property PhysicMaterialCombine frictionCombine();
+        @property void frictionCombine(PhysicMaterialCombine val);
+        @property PhysicMaterialCombine bounceCombine();
+        @property void bounceCombine(PhysicMaterialCombine val);
+        @property float bouncyness();
+        @property void bouncyness(float val);
+        @property Vector3 frictionDirection2();
+        @property void frictionDirection2(Vector3 val);
+        @property float dynamicFriction2();
+        @property void dynamicFriction2(float val);
+        @property float staticFriction2();
+        @property void staticFriction2(float val);
+        @property Vector3 frictionDirection();
+        @property void frictionDirection(Vector3 val);
+    }
+
+    struct PhysicsScene
+    {
+        mixin(monoObjectImpl);
+
+        // internals
+        int m_Handle;
+
+        int BoxCast(Vector3 center, Vector3 halfExtents, Vector3 direction, RaycastHit[] results);
+        bool BoxCast(Vector3 center, Vector3 halfExtents, Vector3 direction, out RaycastHit hitInfo);
+        bool BoxCast(Vector3 center, Vector3 halfExtents, Vector3 direction, out RaycastHit hitInfo, Quaternion orientation, float maxDistance = float.infinity, int layerMask = -5, QueryTriggerInteraction queryTriggerInteraction = QueryTriggerInteraction.UseGlobal);
+        int BoxCast(Vector3 center, Vector3 halfExtents, Vector3 direction, RaycastHit[] results, Quaternion orientation, float maxDistance = float.infinity, int layerMask = -5, QueryTriggerInteraction queryTriggerInteraction = QueryTriggerInteraction.UseGlobal);
+        bool CapsuleCast(Vector3 point1, Vector3 point2, float radius, Vector3 direction, out RaycastHit hitInfo, float maxDistance = float.infinity, int layerMask = -5, QueryTriggerInteraction queryTriggerInteraction = QueryTriggerInteraction.UseGlobal);
+        int CapsuleCast(Vector3 point1, Vector3 point2, float radius, Vector3 direction, RaycastHit[] results, float maxDistance = float.infinity, int layerMask = -5, QueryTriggerInteraction queryTriggerInteraction = QueryTriggerInteraction.UseGlobal);
+        /*override*/ bool Equals(Object other);
+        bool Equals(PhysicsScene other);
+        /*override*/ int GetHashCode();
+        bool IsEmpty();
+        bool IsValid();
+        int OverlapBox(Vector3 center, Vector3 halfExtents, Collider[] results);
+        int OverlapBox(Vector3 center, Vector3 halfExtents, Collider[] results, Quaternion orientation, int layerMask = -5,  QueryTriggerInteraction queryTriggerInteraction = QueryTriggerInteraction.UseGlobal);
+        int OverlapCapsule(Vector3 point0, Vector3 point1, float radius, Collider[] results, int layerMask = -1, QueryTriggerInteraction queryTriggerInteraction = QueryTriggerInteraction.UseGlobal);
+        int OverlapSphere(Vector3 position, float radius, Collider[] results, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        int Raycast(Vector3 origin, Vector3 direction, RaycastHit[] raycastHits, float maxDistance = float.infinity, int layerMask = -5, QueryTriggerInteraction queryTriggerInteraction = QueryTriggerInteraction.UseGlobal);
+        bool Raycast(Vector3 origin, Vector3 direction, out RaycastHit hitInfo, float maxDistance = float.infinity, int layerMask = -5, QueryTriggerInteraction queryTriggerInteraction = QueryTriggerInteraction.UseGlobal);
+        bool Raycast(Vector3 origin, Vector3 direction, float maxDistance = float.infinity, int layerMask = -5, QueryTriggerInteraction queryTriggerInteraction = QueryTriggerInteraction.UseGlobal);
+        void Simulate(float step);
+        int SphereCast(Vector3 origin, float radius, Vector3 direction, RaycastHit[] results, float maxDistance = float.infinity, int layerMask = -5, QueryTriggerInteraction queryTriggerInteraction = QueryTriggerInteraction.UseGlobal);
+        bool SphereCast(Vector3 origin, float radius, Vector3 direction, out RaycastHit hitInfo, float maxDistance = float.infinity, int layerMask = -5, QueryTriggerInteraction queryTriggerInteraction = QueryTriggerInteraction.UseGlobal);
+        /*override*/ string ToString();
+    }
+
+
+    abstract class Physics
+    {
+        mixin(monoObjectImpl);
+
+        enum float k_MaxFloatMinusEpsilon = 340282326356119260000000000000000000000f;
+
+        enum int IgnoreRaycastLayer = 1 << 2;
+        enum int DefaultRaycastLayers = ~IgnoreRaycastLayer;
+        enum int AllLayers = ~0;
+
+        @property static float minPenetrationForPenalty();
+        @property static void minPenetrationForPenalty(float val);
+        @property static Vector3 gravity();
+        @property static void gravity(Vector3 val);
+        @property static float defaultContactOffset();
+        @property static void defaultContactOffset(float val);
+        @property static float sleepThreshold();
+        @property static void sleepThreshold(float val);
+        @property static bool queriesHitTriggers();
+        @property static void queriesHitTriggers(bool val);
+        @property static bool queriesHitBackfaces();
+        @property static void queriesHitBackfaces(bool val);
+        @property static float bounceThreshold();
+        @property static void bounceThreshold(float val);
+        @property static int defaultSolverIterations();
+        @property static void defaultSolverIterations(int val);
+        @property static int defaultSolverVelocityIterations();
+        @property static void defaultSolverVelocityIterations(int val);
+        @property static float bounceTreshold();
+        @property static void bounceTreshold(float val);
+        @property static float sleepVelocity();
+        @property static void sleepVelocity(float val);
+        @property static float sleepAngularVelocity();
+        @property static void sleepAngularVelocity(float val);
+        @property static float maxAngularVelocity();
+        @property static void maxAngularVelocity(float val);
+        @property static int solverIterationCount();
+        @property static void solverIterationCount(int val);
+        @property static int solverVelocityIterationCount();
+        @property static void solverVelocityIterationCount(int val);
+        @property static float penetrationPenaltyForce();
+        @property static void penetrationPenaltyForce(float val);
+        @property static float defaultMaxAngularSpeed();
+        @property static void defaultMaxAngularSpeed(float val);
+        @property static PhysicsScene defaultPhysicsScene();
+        @property static bool autoSimulation();
+        @property static void autoSimulation(bool val);
+        @property static bool autoSyncTransforms();
+        @property static void autoSyncTransforms(bool val);
+        @property static bool reuseCollisionCallbacks();
+        @property static void reuseCollisionCallbacks(bool val);
+        @property static float interCollisionDistance();
+        @property static void interCollisionDistance(float val);
+        @property static float interCollisionStiffness();
+        @property static void interCollisionStiffness(float val);
+        @property static bool interCollisionSettingsToggle();
+        @property static void interCollisionSettingsToggle(bool val);
+        @property static Vector3 clothGravity();
+        @property static void clothGravity(Vector3 val);
+
+        static void IgnoreCollision(Collider collider1, Collider collider2, bool ignore);
+        static void IgnoreCollision(Collider collider1, Collider collider2);
+        static void IgnoreLayerCollision(int layer1, int layer2, bool ignore);
+        static void IgnoreLayerCollision(int layer1, int layer2);
+        static bool GetIgnoreLayerCollision(int layer1, int layer2);
+        static bool GetIgnoreCollision(Collider collider1, Collider collider2);
+        static bool Raycast(Vector3 origin, Vector3 direction, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static bool Raycast(Vector3 origin, Vector3 direction, float maxDistance, int layerMask);
+        static bool Raycast(Vector3 origin, Vector3 direction, float maxDistance);
+        static bool Raycast(Vector3 origin, Vector3 direction);
+        static bool Raycast(Vector3 origin, Vector3 direction, out RaycastHit hitInfo, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static bool Raycast(Vector3 origin, Vector3 direction, out RaycastHit hitInfo, float maxDistance, int layerMask);
+        static bool Raycast(Vector3 origin, Vector3 direction, out RaycastHit hitInfo, float maxDistance);
+        static bool Raycast(Vector3 origin, Vector3 direction, out RaycastHit hitInfo);
+        static bool Raycast(Ray ray, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static bool Raycast(Ray ray, float maxDistance, int layerMask);
+        static bool Raycast(Ray ray, float maxDistance);
+        static bool Raycast(Ray ray);
+        static bool Raycast(Ray ray, out RaycastHit hitInfo, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static bool Raycast(Ray ray, out RaycastHit hitInfo, float maxDistance, int layerMask);
+        static bool Raycast(Ray ray, out RaycastHit hitInfo, float maxDistance);
+        static bool Raycast(Ray ray, out RaycastHit hitInfo);
+        static bool Linecast(Vector3 start, Vector3 end, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static bool Linecast(Vector3 start, Vector3 end, int layerMask);
+        static bool Linecast(Vector3 start, Vector3 end);
+        static bool Linecast(Vector3 start, Vector3 end, out RaycastHit hitInfo, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static bool Linecast(Vector3 start, Vector3 end, out RaycastHit hitInfo, int layerMask);
+        static bool Linecast(Vector3 start, Vector3 end, out RaycastHit hitInfo);
+        static bool CapsuleCast(Vector3 point1, Vector3 point2, float radius, Vector3 direction, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static bool CapsuleCast(Vector3 point1, Vector3 point2, float radius, Vector3 direction, float maxDistance, int layerMask);
+        static bool CapsuleCast(Vector3 point1, Vector3 point2, float radius, Vector3 direction, float maxDistance);
+        static bool CapsuleCast(Vector3 point1, Vector3 point2, float radius, Vector3 direction);
+        static bool CapsuleCast(Vector3 point1, Vector3 point2, float radius, Vector3 direction, out RaycastHit hitInfo, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static bool CapsuleCast(Vector3 point1, Vector3 point2, float radius, Vector3 direction, out RaycastHit hitInfo, float maxDistance, int layerMask);
+        static bool CapsuleCast(Vector3 point1, Vector3 point2, float radius, Vector3 direction, out RaycastHit hitInfo, float maxDistance);
+        static bool CapsuleCast(Vector3 point1, Vector3 point2, float radius, Vector3 direction, out RaycastHit hitInfo);
+        static bool SphereCast(Vector3 origin, float radius, Vector3 direction, out RaycastHit hitInfo, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static bool SphereCast(Vector3 origin, float radius, Vector3 direction, out RaycastHit hitInfo, float maxDistance, int layerMask);
+        static bool SphereCast(Vector3 origin, float radius, Vector3 direction, out RaycastHit hitInfo, float maxDistance);
+        static bool SphereCast(Vector3 origin, float radius, Vector3 direction, out RaycastHit hitInfo);
+        static bool SphereCast(Ray ray, float radius, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static bool SphereCast(Ray ray, float radius, float maxDistance, int layerMask);
+        static bool SphereCast(Ray ray, float radius, float maxDistance);
+        static bool SphereCast(Ray ray, float radius);
+        static bool SphereCast(Ray ray, float radius, out RaycastHit hitInfo, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static bool SphereCast(Ray ray, float radius, out RaycastHit hitInfo, float maxDistance, int layerMask);
+        static bool SphereCast(Ray ray, float radius, out RaycastHit hitInfo, float maxDistance);
+        static bool SphereCast(Ray ray, float radius, out RaycastHit hitInfo);
+        static bool BoxCast(Vector3 center, Vector3 halfExtents, Vector3 direction, Quaternion orientation, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static bool BoxCast(Vector3 center, Vector3 halfExtents, Vector3 direction, Quaternion orientation, float maxDistance, int layerMask);
+        static bool BoxCast(Vector3 center, Vector3 halfExtents, Vector3 direction, Quaternion orientation, float maxDistance);
+        static bool BoxCast(Vector3 center, Vector3 halfExtents, Vector3 direction, Quaternion orientation);
+        static bool BoxCast(Vector3 center, Vector3 halfExtents, Vector3 direction);
+        static bool BoxCast(Vector3 center, Vector3 halfExtents, Vector3 direction, out RaycastHit hitInfo, Quaternion orientation, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static bool BoxCast(Vector3 center, Vector3 halfExtents, Vector3 direction, out RaycastHit hitInfo, Quaternion orientation, float maxDistance, int layerMask);
+        static bool BoxCast(Vector3 center, Vector3 halfExtents, Vector3 direction, out RaycastHit hitInfo, Quaternion orientation, float maxDistance);
+        static bool BoxCast(Vector3 center, Vector3 halfExtents, Vector3 direction, out RaycastHit hitInfo, Quaternion orientation);
+        static bool BoxCast(Vector3 center, Vector3 halfExtents, Vector3 direction, out RaycastHit hitInfo);
+        static RaycastHit[] RaycastAll(Vector3 origin, Vector3 direction, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static RaycastHit[] RaycastAll(Vector3 origin, Vector3 direction, float maxDistance, int layerMask);
+        static RaycastHit[] RaycastAll(Vector3 origin, Vector3 direction, float maxDistance);
+        static RaycastHit[] RaycastAll(Vector3 origin, Vector3 direction);
+        static RaycastHit[] RaycastAll(Ray ray, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static RaycastHit[] RaycastAll(Ray ray, float maxDistance, int layerMask);
+        static RaycastHit[] RaycastAll(Ray ray, float maxDistance);
+        static RaycastHit[] RaycastAll(Ray ray);
+        static int RaycastNonAlloc(Ray ray, RaycastHit[] results, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static int RaycastNonAlloc(Ray ray, RaycastHit[] results, float maxDistance, int layerMask);
+        static int RaycastNonAlloc(Ray ray, RaycastHit[] results, float maxDistance);
+        static int RaycastNonAlloc(Ray ray, RaycastHit[] results);
+        static int RaycastNonAlloc(Vector3 origin, Vector3 direction, RaycastHit[] results, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static int RaycastNonAlloc(Vector3 origin, Vector3 direction, RaycastHit[] results, float maxDistance, int layerMask);
+        static int RaycastNonAlloc(Vector3 origin, Vector3 direction, RaycastHit[] results, float maxDistance);
+        static int RaycastNonAlloc(Vector3 origin, Vector3 direction, RaycastHit[] results);
+        static RaycastHit[] CapsuleCastAll(Vector3 point1, Vector3 point2, float radius, Vector3 direction, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static RaycastHit[] CapsuleCastAll(Vector3 point1, Vector3 point2, float radius, Vector3 direction, float maxDistance, int layerMask);
+        static RaycastHit[] CapsuleCastAll(Vector3 point1, Vector3 point2, float radius, Vector3 direction, float maxDistance);
+        static RaycastHit[] CapsuleCastAll(Vector3 point1, Vector3 point2, float radius, Vector3 direction);
+        static RaycastHit[] SphereCastAll(Vector3 origin, float radius, Vector3 direction, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static RaycastHit[] SphereCastAll(Vector3 origin, float radius, Vector3 direction, float maxDistance, int layerMask);
+        static RaycastHit[] SphereCastAll(Vector3 origin, float radius, Vector3 direction, float maxDistance);
+        static RaycastHit[] SphereCastAll(Vector3 origin, float radius, Vector3 direction);
+        static RaycastHit[] SphereCastAll(Ray ray, float radius, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static RaycastHit[] SphereCastAll(Ray ray, float radius, float maxDistance, int layerMask);
+        static RaycastHit[] SphereCastAll(Ray ray, float radius, float maxDistance);
+        static RaycastHit[] SphereCastAll(Ray ray, float radius);
+        static Collider[] OverlapCapsule(Vector3 point0, Vector3 point1, float radius, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static Collider[] OverlapCapsule(Vector3 point0, Vector3 point1, float radius, int layerMask);
+        static Collider[] OverlapCapsule(Vector3 point0, Vector3 point1, float radius);
+        static Collider[] OverlapSphere(Vector3 position, float radius, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static Collider[] OverlapSphere(Vector3 position, float radius, int layerMask);
+        static Collider[] OverlapSphere(Vector3 position, float radius);
+        static void Simulate(float step);
+        static void SyncTransforms();
+        static bool ComputePenetration(Collider colliderA, Vector3 positionA, Quaternion rotationA, Collider colliderB, Vector3 positionB, Quaternion rotationB, out Vector3 direction, out float distance);
+        static Vector3 ClosestPoint(Vector3 point, Collider collider, Vector3 position, Quaternion rotation);
+        static int OverlapSphereNonAlloc(Vector3 position, float radius, Collider[] results, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static int OverlapSphereNonAlloc(Vector3 position, float radius, Collider[] results, int layerMask);
+        static int OverlapSphereNonAlloc(Vector3 position, float radius, Collider[] results);
+        static bool CheckSphere(Vector3 position, float radius, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static bool CheckSphere(Vector3 position, float radius, int layerMask);
+        static bool CheckSphere(Vector3 position, float radius);
+        static int CapsuleCastNonAlloc(Vector3 point1, Vector3 point2, float radius, Vector3 direction, RaycastHit[] results, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static int CapsuleCastNonAlloc(Vector3 point1, Vector3 point2, float radius, Vector3 direction, RaycastHit[] results, float maxDistance, int layerMask);
+        static int CapsuleCastNonAlloc(Vector3 point1, Vector3 point2, float radius, Vector3 direction, RaycastHit[] results, float maxDistance);
+        static int CapsuleCastNonAlloc(Vector3 point1, Vector3 point2, float radius, Vector3 direction, RaycastHit[] results);
+        static int SphereCastNonAlloc(Vector3 origin, float radius, Vector3 direction, RaycastHit[] results, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static int SphereCastNonAlloc(Vector3 origin, float radius, Vector3 direction, RaycastHit[] results, float maxDistance, int layerMask);
+        static int SphereCastNonAlloc(Vector3 origin, float radius, Vector3 direction, RaycastHit[] results, float maxDistance);
+        static int SphereCastNonAlloc(Vector3 origin, float radius, Vector3 direction, RaycastHit[] results);
+        static int SphereCastNonAlloc(Ray ray, float radius, RaycastHit[] results, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static int SphereCastNonAlloc(Ray ray, float radius, RaycastHit[] results, float maxDistance, int layerMask);
+        static int SphereCastNonAlloc(Ray ray, float radius, RaycastHit[] results, float maxDistance);
+        static int SphereCastNonAlloc(Ray ray, float radius, RaycastHit[] results);
+        static bool CheckCapsule(Vector3 start, Vector3 end, float radius, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static bool CheckCapsule(Vector3 start, Vector3 end, float radius, int layerMask);
+        static bool CheckCapsule(Vector3 start, Vector3 end, float radius);
+        static bool CheckBox(Vector3 center, Vector3 halfExtents, Quaternion orientation, int layermask, QueryTriggerInteraction queryTriggerInteraction);
+        static bool CheckBox(Vector3 center, Vector3 halfExtents, Quaternion orientation, int layerMask);
+        static bool CheckBox(Vector3 center, Vector3 halfExtents, Quaternion orientation);
+        static bool CheckBox(Vector3 center, Vector3 halfExtents);
+        static Collider[] OverlapBox(Vector3 center, Vector3 halfExtents, Quaternion orientation, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static Collider[] OverlapBox(Vector3 center, Vector3 halfExtents, Quaternion orientation, int layerMask);
+        static Collider[] OverlapBox(Vector3 center, Vector3 halfExtents, Quaternion orientation);
+        static Collider[] OverlapBox(Vector3 center, Vector3 halfExtents);
+        static int OverlapBoxNonAlloc(Vector3 center, Vector3 halfExtents, Collider[] results, Quaternion orientation, int mask, QueryTriggerInteraction queryTriggerInteraction);
+        static int OverlapBoxNonAlloc(Vector3 center, Vector3 halfExtents, Collider[] results, Quaternion orientation, int mask);
+        static int OverlapBoxNonAlloc(Vector3 center, Vector3 halfExtents, Collider[] results, Quaternion orientation);
+        static int OverlapBoxNonAlloc(Vector3 center, Vector3 halfExtents, Collider[] results);
+        static int BoxCastNonAlloc(Vector3 center, Vector3 halfExtents, Vector3 direction, RaycastHit[] results, Quaternion orientation, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static int BoxCastNonAlloc(Vector3 center, Vector3 halfExtents, Vector3 direction, RaycastHit[] results, Quaternion orientation);
+        static int BoxCastNonAlloc(Vector3 center, Vector3 halfExtents, Vector3 direction, RaycastHit[] results, Quaternion orientation, float maxDistance);
+        static int BoxCastNonAlloc(Vector3 center, Vector3 halfExtents, Vector3 direction, RaycastHit[] results, Quaternion orientation, float maxDistance, int layerMask);
+        static int BoxCastNonAlloc(Vector3 center, Vector3 halfExtents, Vector3 direction, RaycastHit[] results);
+        static RaycastHit[] BoxCastAll(Vector3 center, Vector3 halfExtents, Vector3 direction, Quaternion orientation, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static RaycastHit[] BoxCastAll(Vector3 center, Vector3 halfExtents, Vector3 direction, Quaternion orientation, float maxDistance, int layerMask);
+        static RaycastHit[] BoxCastAll(Vector3 center, Vector3 halfExtents, Vector3 direction, Quaternion orientation, float maxDistance);
+        static RaycastHit[] BoxCastAll(Vector3 center, Vector3 halfExtents, Vector3 direction, Quaternion orientation);
+        static RaycastHit[] BoxCastAll(Vector3 center, Vector3 halfExtents, Vector3 direction);
+        static int OverlapCapsuleNonAlloc(Vector3 point0, Vector3 point1, float radius, Collider[] results, int layerMask, QueryTriggerInteraction queryTriggerInteraction);
+        static int OverlapCapsuleNonAlloc(Vector3 point0, Vector3 point1, float radius, Collider[] results, int layerMask);
+        static int OverlapCapsuleNonAlloc(Vector3 point0, Vector3 point1, float radius, Collider[] results);
+        static void RebuildBroadphaseRegions(Bounds worldBounds, int subdivisions);
     }
 
 
@@ -351,16 +941,16 @@ enum unityDefaultAssembly = "Assembly-CSharp";
         @property static int renderedFrameCount();
         @property static int frameCount();
         @property static float timeScale();
-        @property static float timeScale(float val);
+        @property static void timeScale(float val);
         @property static float maximumParticleDeltaTime();
-        @property static float maximumParticleDeltaTime(float val);
+        @property static void maximumParticleDeltaTime(float val);
         @property static float smoothDeltaTime();
         @property static float maximumDeltaTime();
-        @property static float maximumDeltaTime(float val);
+        @property static void maximumDeltaTime(float val);
         @property static int captureFramerate();
-        @property static int captureFramerate(float val);
+        @property static void captureFramerate(float val);
         @property static float fixedDeltaTime();
-        @property static float fixedDeltaTime(float val);
+        @property static void fixedDeltaTime(float val);
         @property static float unscaledDeltaTime();
         @property static float fixedUnscaledTime();
         @property static float unscaledTime();
@@ -436,6 +1026,335 @@ enum unityDefaultAssembly = "Assembly-CSharp";
 
 
     abstract class Light : Component
+    {
+        mixin(monoObjectImpl);
+    }
+
+    abstract class Collider : Component
+    {
+        mixin(monoObjectImpl);
+
+        @property bool enabled();
+        @property void enabled(bool val);
+        @property Rigidbody attachedRigidbody();
+        @property bool isTrigger();
+        @property void isTrigger(bool val);
+        @property float contactOffset();
+        @property void contactOffset(float val);
+        @property Bounds bounds();
+        @property PhysicMaterial sharedMaterial();
+        @property void sharedMaterial(PhysicMaterial val);
+        @property PhysicMaterial material();
+        @property void material(PhysicMaterial val);
+
+        Vector3 ClosestPoint(Vector3 position);
+        Vector3 ClosestPointOnBounds(Vector3 position);
+        bool Raycast(Ray ray, out RaycastHit hitInfo, float maxDistance);
+    }
+
+    abstract class BoxCollider : Collider
+    {
+        mixin(monoObjectImpl);
+
+        @property Vector3 center();
+        @property void center(Vector3 val);
+        @property Vector3 size();
+        @property void size(Vector3 val);
+        @property Vector3 extents();
+        @property void extents(Vector3 val);
+    }
+
+
+    abstract class Rigidbody : Component
+    {
+        mixin(monoObjectImpl);
+
+        @property Vector3 angularVelocity();
+        @property void angularVelocity(Vector3 val);
+        @property float drag();
+        @property void drag(float val);
+        @property float angularDrag();
+        @property void angularDrag(float val);
+        @property float mass();
+        @property void mass(float val);
+        @property bool useGravity();
+        @property void useGravity(bool val);
+        @property float maxDepenetrationVelocity();
+        @property void maxDepenetrationVelocity(float val);
+        @property bool isKinematic();
+        @property void isKinematic(bool val);
+        @property bool freezeRotation();
+        @property void freezeRotation(bool val);
+        @property RigidbodyConstraints constraints();
+        @property void constraints(RigidbodyConstraints val);
+        @property CollisionDetectionMode collisionDetectionMode();
+        @property void collisionDetectionMode(CollisionDetectionMode val);
+        @property Vector3 centerOfMass();
+        @property void centerOfMass(Vector3 val);
+        @property Vector3 worldCenterOfMass();
+        @property Quaternion inertiaTensorRotation();
+        @property void inertiaTensorRotation(Quaternion val);
+        @property Vector3 inertiaTensor();
+        @property void inertiaTensor(Vector3 val);
+        @property bool detectCollisions();
+        @property void detectCollisions(bool val);
+        @property Vector3 position();
+        @property void position(Vector3 val);
+        @property Quaternion rotation();
+        @property void rotation(Quaternion val);
+        @property RigidbodyInterpolation interpolation();
+        @property void interpolation(RigidbodyInterpolation val);
+        @property int solverIterations();
+        @property void solverIterations(int val);
+        @property float sleepThreshold();
+        @property void sleepThreshold(float val);
+        @property float maxAngularVelocity();
+        @property void maxAngularVelocity(float val);
+        @property int solverVelocityIterations();
+        @property void solverVelocityIterations(int val);
+        @property float sleepVelocity();
+        @property void sleepVelocity(float val);
+        @property float sleepAngularVelocity();
+        @property void sleepAngularVelocity(float val);
+        @property bool useConeFriction();
+        @property void useConeFriction(bool val);
+        @property Vector3 velocity();
+        @property void velocity(Vector3 val);
+        @property int solverIterationCount();
+        @property void solverIterationCount(int val);
+        @property int solverVelocityIterationCount();
+        @property void solverVelocityIterationCount(int val);
+
+        void AddExplosionForce(float explosionForce, Vector3 explosionPosition, float explosionRadius, float upwardsModifier, ForceMode mode);
+        void AddExplosionForce(float explosionForce, Vector3 explosionPosition, float explosionRadius, float upwardsModifier);
+        void AddExplosionForce(float explosionForce, Vector3 explosionPosition, float explosionRadius);
+        void AddForce(Vector3 force, ForceMode mode);
+        void AddForce(Vector3 force);
+        void AddForce(float x, float y, float z, ForceMode mode);
+        void AddForce(float x, float y, float z);
+        void AddForceAtPosition(Vector3 force, Vector3 position);
+        void AddForceAtPosition(Vector3 force, Vector3 position, ForceMode mode);
+        void AddRelativeForce(Vector3 force, ForceMode mode);
+        void AddRelativeForce(Vector3 force);
+        void AddRelativeForce(float x, float y, float z);
+        void AddRelativeForce(float x, float y, float z, ForceMode mode);
+        void AddRelativeTorque(Vector3 torque, ForceMode mode);
+        void AddRelativeTorque(Vector3 torque);
+        void AddRelativeTorque(float x, float y, float z, ForceMode mode);
+        void AddRelativeTorque(float x, float y, float z);
+        void AddTorque(Vector3 torque, ForceMode mode);
+        void AddTorque(float x, float y, float z, ForceMode mode);
+        void AddTorque(Vector3 torque);
+        void AddTorque(float x, float y, float z);
+        Vector3 ClosestPointOnBounds(Vector3 position);
+        Vector3 GetPointVelocity(Vector3 worldPoint);
+        Vector3 GetRelativePointVelocity(Vector3 relativePoint);
+        bool IsSleeping();
+        void MovePosition(Vector3 position);
+        void MoveRotation(Quaternion rot);
+        void ResetCenterOfMass();
+        void ResetInertiaTensor();
+        void SetDensity(float density);
+        void SetMaxAngularVelocity(float a);
+        void Sleep();
+        bool SweepTest(Vector3 direction, out RaycastHit hitInfo, float maxDistance, QueryTriggerInteraction queryTriggerInteraction);
+        bool SweepTest(Vector3 direction, out RaycastHit hitInfo, float maxDistance);
+        bool SweepTest(Vector3 direction, out RaycastHit hitInfo);
+        RaycastHit[] SweepTestAll(Vector3 direction, float maxDistance, QueryTriggerInteraction queryTriggerInteraction);
+        RaycastHit[] SweepTestAll(Vector3 direction, float maxDistance);
+        RaycastHit[] SweepTestAll(Vector3 direction);
+        void WakeUp();
+
+    }
+
+
+    abstract class Camera : Behaviour
+    {
+        mixin(monoObjectImpl);
+
+        @property float nearClipPlane();
+        @property void nearClipPlane(float val);
+        @property float farClipPlane();
+        @property void farClipPlane(float val);
+        @property float fieldOfView();
+        @property void fieldOfView(float val);
+        @property RenderingPath renderingPath();
+        @property void renderingPath(RenderingPath val);
+        @property RenderingPath actualRenderingPath();
+        @property bool allowHDR();
+        @property void allowHDR(bool val);
+        @property bool allowMSAA();
+        @property void allowMSAA(bool val);
+        @property bool allowDynamicResolution();
+        @property void allowDynamicResolution(bool val);
+        @property bool forceIntoRenderTexture();
+        @property void forceIntoRenderTexture(bool val);
+        @property float orthographicSize();
+        @property void orthographicSize(float val);
+        @property bool orthographic();
+        @property void orthographic(bool val);
+        @property OpaqueSortMode opaqueSortMode();
+        @property void opaqueSortMode(OpaqueSortMode val);
+        @property TransparencySortMode transparencySortMode();
+        @property void transparencySortMode(TransparencySortMode val);
+        @property Vector3 transparencySortAxis();
+        @property void transparencySortAxis(Vector3 val);
+        @property float depth();
+        @property void depth(float val);
+        @property float aspect();
+        @property void aspect(float val);
+        @property Vector3 velocity();
+        @property int cullingMask();
+        @property void cullingMask(int val);
+        @property int eventMask();
+        @property void eventMask(int val);
+        @property bool layerCullSpherical();
+        @property void layerCullSpherical(bool val);
+        @property CameraType cameraType();
+        @property void cameraType(CameraType val);
+        @property ulong overrideSceneCullingMask();
+        @property void overrideSceneCullingMask(ulong val);
+        @property float[] layerCullDistances();
+        @property void layerCullDistances(float[] val);
+        @property static int PreviewCullingLayer();
+        @property bool useOcclusionCulling();
+        @property void useOcclusionCulling(bool val);
+        @property Matrix4x4 cullingMatrix();
+        @property void cullingMatrix(Matrix4x4 val);
+        @property Color backgroundColor();
+        @property void backgroundColor(Color val);
+        @property CameraClearFlags clearFlags();
+        @property void clearFlags(CameraClearFlags val);
+        @property DepthTextureMode depthTextureMode();
+        @property void depthTextureMode(DepthTextureMode val);
+        @property bool clearStencilAfterLightingPass();
+        @property void clearStencilAfterLightingPass(bool val);
+        //@property ProjectionMatrixMode projectionMatrixMode();
+        @property bool usePhysicalProperties();
+        @property void usePhysicalProperties(bool val);
+        @property Vector2 sensorSize();
+        @property void sensorSize(Vector2 val);
+        @property Vector2 lensShift();
+        @property void lensShift(Vector2 val);
+        @property float focalLength();
+        @property void focalLength(float val);
+        @property GateFitMode gateFit();
+        @property void gateFit(GateFitMode val);
+        @property Rect rect();
+        @property void rect(Rect val);
+        @property Rect pixelRect();
+        @property void pixelRect(Rect val);
+        @property int pixelWidth();
+        @property int pixelHeight();
+        @property int scaledPixelWidth();
+        @property int scaledPixelHeight();
+        @property RenderTexture targetTexture();
+        @property void targetTexture(RenderTexture val);
+        @property RenderTexture activeTexture();
+        @property int targetDisplay();
+        @property void targetDisplay(int val);
+        @property Matrix4x4 cameraToWorldMatrix();
+        @property Matrix4x4 worldToCameraMatrix();
+        @property void worldToCameraMatrix(Matrix4x4 val);
+        @property Matrix4x4 projectionMatrix();
+        @property void projectionMatrix(Matrix4x4 val);
+        @property Matrix4x4 nonJitteredProjectionMatrix();
+        @property void nonJitteredProjectionMatrix(Matrix4x4 val);
+        @property bool useJitteredProjectionMatrixForTransparentRendering();
+        @property void useJitteredProjectionMatrixForTransparentRendering(bool val);
+        @property Matrix4x4 previousViewProjectionMatrix();
+        @property static Camera main();
+        @property static Camera current();
+        @property Scene scene();
+        @property void scene(Scene val);
+        @property bool stereoEnabled();
+        @property float stereoSeparation();
+        @property void stereoSeparation(float val);
+        @property float stereoConvergence();
+        @property void stereoConvergence(float val);
+        @property bool areVRStereoViewMatricesWithinSingleCullTolerance();
+        @property StereoTargetEyeMask stereoTargetEye();
+        @property void stereoTargetEye(StereoTargetEyeMask val);
+        @property MonoOrStereoscopicEye stereoActiveEye();
+        @property static int allCamerasCount();
+        @property static Camera[] allCameras();
+        @property int commandBufferCount();
+        @property bool isOrthoGraphic();
+        @property void isOrthoGraphic(bool val);
+        @property static Camera mainCamera();
+        @property float near();
+        @property void near(float val);
+        @property float far();
+        @property void far(float val);
+        @property float fov();
+        @property void fov(float val);
+        @property bool hdr();
+        @property void hdr(bool val);
+        @property bool stereoMirrorMode();
+        @property void stereoMirrorMode(bool val);
+        
+        enum StereoscopicEye
+        {
+            Left = 0,
+            Right = 1
+        }
+
+        enum MonoOrStereoscopicEye
+        {
+            Left = 0,
+            Right = 1,
+            Mono = 2
+        }
+
+        enum GateFitMode
+        {
+            None = 0,
+            Vertical = 1,
+            Horizontal = 2,
+            Fill = 3,
+            Overscan = 4
+        }
+
+        enum FieldOfViewAxis
+        {
+            Vertical = 0,
+            Horizontal = 1
+        }
+    }
+
+    abstract class Random
+    {
+        mixin(monoObjectImpl);
+
+        @property static Quaternion rotation();
+        @property static Vector3 onUnitSphere();
+        @property static Vector2 insideUnitCircle();
+        @property static Vector3 insideUnitSphere();
+        @property static float value();
+        //@property static State state { get; set; }
+        @property static int seed();
+        @property static void seed(int val);
+        @property static Quaternion rotationUniform();
+
+        static int Range(int min, int max);
+        static float Range(float min, float max);
+    }
+
+    abstract class Resources
+    {
+        mixin(monoObjectImpl);
+
+        static Object_ Load(string path);
+        static T Load(T)(string path) { mixin(monoGenericMethod); }
+
+    }
+
+    abstract class Texture : Object_
+    {
+        mixin(monoObjectImpl);
+    }
+
+    abstract class RenderTexture : Texture
     {
         mixin(monoObjectImpl);
     }
