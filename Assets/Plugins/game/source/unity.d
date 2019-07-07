@@ -241,8 +241,8 @@ enum unityDefaultAssembly = "Assembly-CSharp";
         Component GetComponent(Type type);
         T GetComponent(T)() { mixin(monoGenericMethod!T); }
         Component GetComponent(string type);
+        T GetComponentInChildren(T)() { mixin(monoGenericMethod!T); }
         /*
-        T GetComponentInChildren(T)();
         T GetComponentInChildren(T)(bool includeInactive);
         Component GetComponentInChildren(Type t, bool includeInactive);
         Component GetComponentInChildren(Type t);
@@ -1357,6 +1357,21 @@ enum unityDefaultAssembly = "Assembly-CSharp";
     abstract class RenderTexture : Texture
     {
         mixin(monoObjectImpl);
+    }
+
+    abstract class Renderer : Component
+    {
+        mixin(monoObjectImpl);
+    }
+
+    abstract class TrailRenderer : Renderer
+    {
+        mixin(monoObjectImpl);
+
+        @property float time();
+        @property void time(float val);
+
+        void Clear();
     }
 }
 
