@@ -610,15 +610,28 @@ template MonoImplement(T)
                     import std.conv : to;
                     //mixin("super(", paramSeq(Parameters!m.length), ");");
 
-                    string namespace = getUDAs!(T, NamespaceAttr)[0].name;
+                    static if (getUDAs!(T, AssemblyAttr).length)
+                      enum assemblyName = getUDAs!(T, AssemblyAttr)[0].name;
+                    else
+                      enum assemblyName = "UnityEngine";
+                    static if (getUDAs!(T, NamespaceAttr).length)
+                      string namespace = getUDAs!(T, NamespaceAttr)[0].name;
+                    else
+                      string namespace = "";
+                    static if (getUDAs!(T, SymNameAttr).length)
+                      enum clsName = getUDAs!(T, SymNameAttr)[0].name;
+                    else
+                      enum clsName = __traits(identifier, T);
                     auto dom = MonoDomainHandle.get();
-                    auto ass = dom.openAssembly(namespace);
-                    MonoClassHandle cls = ass.image.classFromName(namespace, T.stringof == "Object_" ? "Object" : T.stringof );
+                    auto ass = dom.openAssembly(assemblyName);
+                    MonoClassHandle cls = ass.image.classFromName(namespace, T.stringof == "Object_" ? "Object" : clsName );
                     auto meth = mono_class_get_method_from_name(cls.handle, ".ctor", Parameters!m.length);
                     void*[Parameters!m.length] args;
                     static foreach(i; 0..args.length)
                     {
-                        static if (!isPointer!(Parameters!m[i]) && (isBasicType!(Parameters!m[i]) || is(Parameters!m[i] == struct)))
+                        static if (__traits(hasMember, Parameters!m[i], "_obj"))
+                        args[i] = mixin("_param_", cast(int) i)._obj;
+                        else static if (!isPointer!(Parameters!m[i]) && (isBasicType!(Parameters!m[i]) || is(Parameters!m[i] == struct)))
                         args[i] = cast(void*) mixin("&_param_", cast(int) i);
                         else static if (is(Parameters!m[i] == string))
                         args[i] = cast(void*) mixin("_param_", cast(int) i, ".boxify");
@@ -630,7 +643,7 @@ template MonoImplement(T)
                     auto res = mono_runtime_invoke(meth, self, args.ptr, &exception);
                     if (exception)
                         throw new MonoException(exception);
-                    super(res);
+                    super(self);
                 }
             }
         }
@@ -668,16 +681,23 @@ mixin template Fun(T, alias fn, string suffix = null)
     import std.conv : text;
         //`pragma(mangle, "`, fn.mangleof, `") `,
     mixin(
-        __traits(identifier, fn) == "__ctor" ? "this " : text(`final`, __traits(isStaticFunction, fn) ? " static " : " override ", `ReturnType!fn `, __traits(identifier, fn)), suffix, `(Parameters!fn)`,
+        __traits(identifier, fn) == "__ctor" ? "this " : text(`final`, __traits(isStaticFunction, fn) ? " static " : (is(T==struct) ? " " : " override "), `ReturnType!fn `, __traits(identifier, fn)), suffix, `(Parameters!fn)`,
         q{{
                 static if (getUDAs!(__traits(parent, fn), AssemblyAttr).length)
                   enum assembly = getUDAs!(__traits(parent, fn), AssemblyAttr)[0].name;
                 else
                   enum assembly = "UnityEngine";
-                enum namespace = getUDAs!(__traits(parent, fn), NamespaceAttr)[0].name;
+                static if (getUDAs!(__traits(parent, fn), NamespaceAttr).length)
+                  string namespace = getUDAs!(__traits(parent, fn), NamespaceAttr)[0].name;
+                else
+                  string namespace = "";
+                static if (getUDAs!(__traits(parent, fn), SymNameAttr).length)
+                  enum clsName = getUDAs!(__traits(parent, fn), SymNameAttr)[0].name;
+                else
+                  enum clsName = __traits(identifier, __traits(parent, fn));
                 auto dom = MonoDomainHandle.get();
                 auto ass = dom.openAssembly(assembly);
-                MonoClassHandle cls = ass.image.classFromName(namespace, __traits(identifier, __traits(parent, fn)) == "Object_" ? "Object" : __traits(identifier, __traits(parent, fn)) );
+                MonoClassHandle cls = ass.image.classFromName(namespace, __traits(identifier, __traits(parent, fn)) == "Object_" ? "Object" : clsName);
                 static if (staticIndexOf!("@property", __traits(getFunctionAttributes, FunctionTypeOf!(fn))) >= 0)
                   static if (Parameters!(FunctionTypeOf!fn).length == 1)
                     auto m = mono_property_get_set_method(mono_class_get_property_from_name(cls.handle, __traits(identifier, fn)));
@@ -693,7 +713,9 @@ mixin template Fun(T, alias fn, string suffix = null)
                 void*[Parameters!fn.length] args;
                 static foreach(i; 0..args.length)
                 {
-                    static if (!isPointer!(Parameters!fn[i]) && (isBasicType!(Parameters!fn[i]) || is(Parameters!fn[i] == struct)))
+                    static if (__traits(hasMember, Parameters!fn[i], "_obj"))
+                    args[i] = mixin("_param_", cast(int)i)._obj;
+                    else static if (!isPointer!(Parameters!fn[i]) && (isBasicType!(Parameters!fn[i]) || is(Parameters!fn[i] == struct)))
                     args[i] = cast(void*) mixin("&_param_", cast(int) i);
                     else static if (is(Parameters!fn[i] == string))
                     args[i] = cast(void*) mixin("_param_", cast(int) i, ".boxify");
@@ -704,6 +726,8 @@ mixin template Fun(T, alias fn, string suffix = null)
                   MonoObject* self = null;
                 else static if (__traits(identifier, fn) == "__ctor")
                   MonoObject* self = mono_object_new(dom.handle, cls.handle);
+                else static if (is(T==struct))
+                  MonoObject* self = cast(MonoObject*) &this;
                 else
                   { MonoObject* self = (cast(__traits(parent, fn))this)._obj; m = mono_object_get_virtual_method(self, m); }
                 MonoObject* exception;
@@ -796,6 +820,8 @@ string monoGenericMethod(Args...)()
 
         static if (__traits(isStaticFunction, fn))
           enum self = null;
+        else static if (is(typeof(this) == struct))
+          MonoObject* self = cast(MonoObject*) &this;
         else
           alias self = _obj;
 
@@ -840,7 +866,9 @@ ReturnType!Method MonoGenericMethod(alias Class, alias Method, Args...)(MonoObje
         void*[Parameters!Method.length] args;
         static foreach(i; 0..args.length)
         {
-            static if (!isPointer!(Parameters!Method[i]) && (isBasicType!(Parameters!Method[i]) || is(Parameters!Method[i] == struct)))
+            static if (__traits(hasMember, Parameters!Method[i], "_obj"))
+            args[i] = mixin("_param_", cast(int) i)._obj;
+            else static if (!isPointer!(Parameters!Method[i]) && (isBasicType!(Parameters!Method[i]) || is(Parameters!Method[i] == struct)))
             args[i] = cast(void*) mixin("&_param_", cast(int) i);
             else static if (is(Parameters!Method[i] == string))
             args[i] = cast(void*) mixin("_param_", cast(int) i, ".boxify");
@@ -1133,7 +1161,7 @@ static assert(!hasOverloadWithObjectParam!(Object_, "name"));
             {
                 static foreach(fn; __traits(getOverloads, typeof(this), m))
                 {
-                    static if(__traits(isStaticFunction, fn))
+                    static if(__traits(isStaticFunction, fn) || is(typeof(this) == struct))
                     {
                         // ---------------------------------------
                         // inserts generic helper for Object params
@@ -1155,12 +1183,23 @@ static assert(!hasOverloadWithObjectParam!(Object_, "name"));
                         // actual static method implementation
                         mixin(
                             `pragma(mangle, "`, fn.mangleof, `")`, '\n',
-                            `final`, __traits(isStaticFunction, fn) ? " static " : " override ", (ReturnType!fn).stringof, " ", __traits(identifier, fn), `_Impl (Parameters!fn)`, 
+                            `final`, __traits(isStaticFunction, fn) ? " static " : (is(typeof(this) == struct) ? " " : " override "), (ReturnType!fn).stringof, " ", __traits(identifier, fn), `_Impl (Parameters!fn)`, 
                             q{{
-                                    string namespace = getUDAs!(__traits(parent, fn), NamespaceAttr)[0].name;
+                                    static if (getUDAs!(typeof(this), AssemblyAttr).length)
+                                      enum assemblyName = getUDAs!(typeof(this), AssemblyAttr)[0].name;
+                                    else
+                                      enum assemblyName = "UnityEngine";
+                                    static if (getUDAs!(__traits(parent, fn), NamespaceAttr).length)
+                                      string namespace = getUDAs!(__traits(parent, fn), NamespaceAttr)[0].name;
+                                    else
+                                      string namespace = "";
+                                    static if (getUDAs!(__traits(parent, fn), SymNameAttr).length)
+                                      enum clsName = getUDAs!(__traits(parent, fn), SymNameAttr)[0].name;
+                                    else
+                                      enum clsName = __traits(identifier, __traits(parent, fn));
                                     auto dom = MonoDomainHandle.get();
-                                    auto ass = dom.openAssembly(namespace);
-                                    MonoClassHandle cls = ass.image.classFromName(namespace, __traits(identifier, __traits(parent, fn)) == "Object_" ? "Object" : __traits(identifier, __traits(parent, fn)) );
+                                    auto ass = dom.openAssembly(assemblyName);
+                                    MonoClassHandle cls = ass.image.classFromName(namespace, __traits(identifier, __traits(parent, fn)) == "Object_" ? "Object" : clsName);
                                     static if (-1 != staticIndexOf!("@property", __traits(getFunctionAttributes, FunctionTypeOf!(fn))))
                                     static if (is(typeof(return) == void))
                                         auto m = mono_property_get_set_method(mono_class_get_property_from_name(cls.handle, __traits(identifier, fn)));
@@ -1171,7 +1210,9 @@ static assert(!hasOverloadWithObjectParam!(Object_, "name"));
                                     void*[Parameters!fn.length] args;
                                     static foreach(i; 0..args.length)
                                     {
-                                        static if (!isPointer!(Parameters!fn[i]) && (isBasicType!(Parameters!fn[i]) || is(Parameters!fn[i] == struct)))
+                                        static if (__traits(hasMember, Parameters!fn[i], "_obj"))
+                                        args[i] = mixin("_param_", cast(int) i)._obj;
+                                        else static if (!isPointer!(Parameters!fn[i]) && (isBasicType!(Parameters!fn[i]) || is(Parameters!fn[i] == struct)))
                                         args[i] = cast(void*) mixin("&_param_", cast(int) i);
                                         else static if (is(Parameters!fn[i] == string))
                                         args[i] = cast(void*) mixin("_param_", cast(int) i, ".boxify");
@@ -1179,7 +1220,9 @@ static assert(!hasOverloadWithObjectParam!(Object_, "name"));
                                         args[i] = cast(void*) mixin("_param_", cast(int) i);
                                     }
                                     static if (__traits(isStaticFunction, fn))
-                                    MonoObject* self = null;
+                                      MonoObject* self = null;
+                                    else static if (is(typeof(this) == struct))
+                                      MonoObject* self = cast(MonoObject*) &this;
                                     else
                                     { MonoObject* self = (cast(__traits(parent, fn))this)._obj; m = mono_object_get_virtual_method(self, m); }
                                     MonoObject* exception;
@@ -1201,14 +1244,21 @@ static assert(!hasOverloadWithObjectParam!(Object_, "name"));
 /// Minimal wrapper mixin, just adds the constructor and object handle fields.
 mixin template MonoObjectImpl()
 {
-    static if (!is(typeof(__traits(getMember, typeof(this), "_obj"))))
-        public MonoObject* _obj;
-
-    this(MonoObject* obj) 
+    static if (is(typeof(this) == struct))
     {
-        static if (__traits(compiles, super(obj)))
-            super(obj);
-        else
-            _obj = obj;
+
+    }
+    else
+    {
+        static if (!is(typeof(__traits(getMember, typeof(this), "_obj"))))
+            public MonoObject* _obj;
+
+        this(MonoObject* obj) 
+        {
+            static if (__traits(compiles, super(obj)))
+                super(obj);
+            else
+                _obj = obj;
+        }
     }
 }
