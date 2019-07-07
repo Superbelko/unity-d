@@ -43,6 +43,9 @@ struct MonoThread;
 
 alias MonoError = uint;
 
+immutable MonoObjectSizeOf = 2 * (void*).sizeof;
+static assert (MonoObjectSizeOf == 16);
+
 struct Prototypes
 {
 extern (C):
@@ -1060,8 +1063,7 @@ T monounwrap(T)(MonoObject* value)
     }
     else static if (is(T == struct))
     {
-        // is offset by MonoObject.sizeof (internal) or by struct size?
-        return *(cast(T*) ((cast(void*)value)+16)); 
+        return *(cast(T*) ((cast(void*)value)+MonoObjectSizeOf)); 
     }
     else static if (__traits(compiles, new MonoImplement!T(value)))
     {
