@@ -31,12 +31,40 @@ class NativeLoader : MonoBehaviour
         [DllImport("kernel32.dll", SetLastError = true)]
         internal extern static IntPtr GetProcAddress(IntPtr hModule, string procName);
 #else
-#error Implement Me
+        [DllImport("libdl")]
+        internal extern static IntPtr dlopen(string name, int flags);
+
+        [DllImport("libdl")]
+        internal extern static int dlclose(IntPtr lib);
+
+        [DllImport("libdl")]
+        internal extern static IntPtr dlsym(IntPtr lib, string name);
+
+
+        const int RTLD_NOW = 2;
+        const int RTLD_GLOBAL = 8;
+
+        internal static IntPtr LoadLibrary(string libraryName)
+        {
+            return dlopen(libraryName, RTLD_NOW);
+        }
+
+        internal static bool FreeLibrary(IntPtr hModule)
+        {
+            dlclose(hModule);
+            return false;
+        }
+
+        internal static IntPtr GetProcAddress(IntPtr hModule, string procName)
+        {
+            IntPtr res = dlsym(hModule, procName);
+            return res;
+        }
 #endif
     }
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void PluginInit(IntPtr entryObject);
+    private delegate void PluginInit(IntPtr entryObject, string monoRt);
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void PluginTick(float dt);
@@ -116,7 +144,7 @@ class NativeLoader : MonoBehaviour
     {
         if (!_objhandle.IsAllocated)
             _objhandle = GCHandle.Alloc(this);
-        _init(GCHandle.ToIntPtr(_objhandle));
+        _init(GCHandle.ToIntPtr(_objhandle), GetMonoPath());
     }
 
     void LoadPlugin()
@@ -170,6 +198,21 @@ class NativeLoader : MonoBehaviour
             if (_objhandle.IsAllocated)
                 _objhandle.Free();
         }
+    }
+
+    string GetMonoPath()
+    {
+        string path = null;
+#if !UNITY_STANDALONE_WIN
+#  if UNITY_EDITOR
+        var editorLocation = System.IO.Path.GetDirectoryName(EditorApplication.applicationPath);
+        path = $"{editorLocation}/Data/MonoBleedingEdge/MonoEmbedRuntime";
+#  else
+        path = $"{Application.dataPath}/MonoBleedingEdge/x86_64";
+#  endif
+        path += "/libmonobdwgc-2.0.so";
+#endif
+        return path;
     }
 }
 

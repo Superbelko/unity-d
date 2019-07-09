@@ -3,15 +3,20 @@ module impl;
 import std.conv; 
 import std.string;
 
-import core.sys.windows.windows;
-import core.sys.windows.dll;
+version(Windows) 
+{
+    import core.sys.windows.windows;
+    import core.sys.windows.dll;
+}
+version(linux)
+    import core.sys.linux.dlfcn;
 
 import mono;
 import unity;
 
 version(app_target) {}
 else
- mixin SimpleDllMain;
+ version(Windows) mixin SimpleDllMain;
 
 enum gamePlaneY = 5f;
 
@@ -33,11 +38,24 @@ struct GameData
     float timeSurvived = 0;
 }
 
+__gshared void* libhandle;
 
 extern(C)
-export void PluginInit(void* owner)
+export void PluginInit(void* owner, const(char)* monoPath)
 {
+    version(Windows) {}
+    else {
+      import core.runtime;
+      Runtime.initialize();
+    }
+
+    version(Windows)
     auto mrt = GetModuleHandle("mono-2.0-bdwgc.dll");
+    else
+    auto mrt = dlopen(monoPath, RTLD_NOW);
+
+    libhandle = mrt;
+ 
     Loader.Load(mrt);
     onPluginLoaded(owner);
 }
@@ -61,7 +79,13 @@ void onPluginLoaded(void* obj)
 extern(C)
 export void PluginShutdown()
 {
-    
+    version(linux)
+    {
+    if (libhandle)
+        dlclose(libhandle);
+    import core.runtime;
+    Runtime.terminate();
+    }
 }
 
 

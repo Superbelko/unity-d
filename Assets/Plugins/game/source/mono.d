@@ -369,15 +369,29 @@ int function(MonoError* error)  mono_error_ok;
 
 struct Loader
 {
+    version(Windows)
     import core.sys.windows.windows;
+    version(linux)
+    import core.sys.linux.dlfcn;
+
     import std.traits;
     
+    version(Windows) 
     static Load(HMODULE lib)
     {
         static foreach(sym; __traits(allMembers, mono))
         {
             static if (isFunctionPointer!(__traits(getMember, mono, sym)))
                 __traits(getMember, mono, sym) = cast(typeof(__traits(getMember, mono, sym))) GetProcAddress(lib, sym);
+        }
+    }
+    else
+    static Load(void* lib)
+    {
+        static foreach(sym; __traits(allMembers, mono))
+        {
+            static if (isFunctionPointer!(__traits(getMember, mono, sym)))
+                __traits(getMember, mono, sym) = cast(typeof(__traits(getMember, mono, sym))) dlsym(lib, sym);
         }
     }
 }
