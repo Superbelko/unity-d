@@ -282,7 +282,7 @@ public class PluginFieldPropertyDrawer : PropertyDrawer
                 pluginPath.stringValue = System.IO.Path.GetDirectoryName(AssetDatabase.GetAssetPath(pluginAsset.objectReferenceValue));
                 pluginName.stringValue = System.IO.Path.GetFileNameWithoutExtension(AssetDatabase.GetAssetPath(pluginAsset.objectReferenceValue));
                 if (pluginName.stringValue.StartsWith("lib"))
-                    pluginName.stringValue.Remove(0, 3);
+                    pluginName.stringValue = pluginName.stringValue.Remove(0, 3);
             }
             else
             {
