@@ -44,7 +44,6 @@ struct MonoThread;
 alias MonoError = uint;
 
 immutable MonoObjectSizeOf = 2 * (void*).sizeof;
-static assert (MonoObjectSizeOf == 16);
 
 struct Prototypes
 {
