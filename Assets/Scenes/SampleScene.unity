@@ -6843,7 +6843,7 @@ MonoBehaviour:
 
     WASD - move
 
-    LCtrl, LBM - shoot'
+    LCtrl, LMB - shoot'
 --- !u!222 &1996529855
 CanvasRenderer:
   m_ObjectHideFlags: 0
