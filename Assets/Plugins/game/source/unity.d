@@ -524,6 +524,15 @@ enum unityDefaultAssembly = "Assembly-CSharp";
         @property float sqrMagnitude();
         @property Vector3 normalized();
         @property float magnitude();
+
+        Vector3 opBinary(string op:"+")(Vector3 b) { return MonoOperator!(opBinary!op)(this, b); }
+        Vector3 opBinary(string op:"-")(Vector3 b) { return MonoOperator!(opBinary!op)(this, b); }
+        Vector3 opUnary(string op:"-")() { return MonoOperator!(opUnary!op)(this); } 
+        Vector3 opBinary(string op:"*")(float d) { return MonoOperator!(opBinary!op)(this, d); }
+        Vector3 opBinaryRight(string op:"*")(float d) { return MonoOperator!(Vector3.opBinaryRight!op)(d, this); }
+        Vector3 opBinary(string op:"/")(float d) { return MonoOperator!(opBinary!op)(this, d); }
+        float opIndex(int i) { return MonoOperator!(opIndex)(this, i); }
+        void opIndexAssign(float val, int index) { MonoOperator!(opIndexAssign)(&this, index, val); }
     }
 
     struct Vector4

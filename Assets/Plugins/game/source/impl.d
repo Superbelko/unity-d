@@ -199,7 +199,7 @@ void SpawnAsteroids()
         GameObject.Instantiate(
             Resources.Load("Asteroid"), 
             spawnAt,
-            Quaternion.LookRotation(Vector3(target.x - spawnAt.x, 0, target.z - spawnAt.z))
+            Quaternion.LookRotation(target - spawnAt)
         )._obj
     );
     Rigidbody rb = asteroid.transform.GetComponent!Rigidbody();
