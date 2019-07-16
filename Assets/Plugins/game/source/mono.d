@@ -1448,7 +1448,7 @@ static assert(!hasOverloadWithObjectParam!(Object_, "name"));
                         else
                         // actual static method implementation
                         mixin(
-                            `pragma(mangle, "`, fn.mangleof, `")`, '\n',
+                            `pragma(mangle, "`, fn.mangleof, `")`, "\n",
                             `final`, __traits(isStaticFunction, fn) ? " static " : (is(typeof(this) == struct) ? " " : " override "), (ReturnType!fn).stringof, " ", __traits(identifier, fn), `_Impl (Parameters!fn)`, 
                             q{{
                                     static if (getUDAs!(typeof(this), AssemblyAttr).length)
