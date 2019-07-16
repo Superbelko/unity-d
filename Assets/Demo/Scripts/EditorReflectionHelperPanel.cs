@@ -51,13 +51,13 @@ public class EditorReflectionHelperPanel : EditorWindow
         }
 
         scroll = EditorGUILayout.BeginScrollView(scroll);
-        EditorGUILayout.TextArea(result, GUILayout.Height(position.height - 60));
+        EditorGUILayout.TextArea(result, GUILayout.Height(Mathf.Max(position.height, result == null ? 0 : result.Count(a => a =='\n') * EditorGUIUtility.singleLineHeight)));
         EditorGUILayout.EndScrollView();
     }
 
     void GenerateWrapper()
     {
-        if (typename.Length == 0) 
+        if (typename == null || typename.Length == 0)
         {
             return;
         }
@@ -100,6 +100,15 @@ public class EditorReflectionHelperPanel : EditorWindow
                     //| BindingFlags.NonPublic // it is probably better to remove this one
                     ;
 
+                System.Action<ParameterInfo[], bool> appendParamList = delegate (ParameterInfo[] param, bool withTypes) {
+                    for (int i = 0; i < param.Length; i++)
+                    {
+                        sb.Append($"{(withTypes ? AdjustedTypeName(param[i].ParameterType) + " " : "")}{param[i].Name}");
+                        if (i + 1 < param.Length)
+                            sb.Append(", ");
+                    }
+                };
+
                 // this will take care of engine modules, at this moment it is recommended to stick with monolithic assembly
                 if (System.IO.Path.GetDirectoryName(res.Assembly.Location).EndsWith("UnityEngine"))
                     sb.AppendLine($"@assembly(\"UnityEngine\");");
@@ -134,8 +143,42 @@ public class EditorReflectionHelperPanel : EditorWindow
                 {
                     foreach (var p in res.GetProperties(flags))
                     {
-                        if (p.IsSpecialName)
+                        
+
+                        // operator[]
+                        if (p.GetIndexParameters().Length > 0)
+                        {
+                            // get
+                            if (p.GetGetMethod() != null)
+                            {
+                                sb.Append($"{AdjustedTypeName(p.GetGetMethod().ReturnType)} opIndex(");
+                                appendParamList(p.GetIndexParameters(), true);
+                                sb.Append(") {");
+                                sb.Append(" return MonoOperator!(opIndex)(this, ");
+                                appendParamList(p.GetGetMethod().GetParameters(), false);
+                                sb.AppendLine("); }");
+                            }
+
+                            // set
+                            if (p.GetSetMethod() != null)
+                            {
+                                sb.Append($"{AdjustedTypeName(p.GetSetMethod().ReturnType)} opIndexAssign(");
+                                var setparams = p.GetSetMethod().GetParameters().Reverse().ToArray();
+                                appendParamList(setparams, true);
+                                sb.Append(") {");
+                                sb.Append(" return MonoOperator!(opIndex)(&this, ");
+                                appendParamList(p.GetSetMethod().GetParameters(), false);
+                                sb.AppendLine("); }");
+                            }
+
                             continue;
+                        }
+
+                        if (p.IsSpecialName)
+                        {
+                            continue;
+                        }
+
                         if (p.CanRead)
                             sb.AppendLine($"@property {(p.GetMethod.IsStatic ? "static " : "")}{AdjustedTypeName(p.PropertyType)} {p.Name}();");
                         if (p.CanWrite)
@@ -148,8 +191,69 @@ public class EditorReflectionHelperPanel : EditorWindow
                 {
                     foreach(var m in res.GetMethods(flags))
                     {
+                        if (IsOperator(m.Name))
+                        {
+                            if (m.Name == "op_Implicit" || m.Name == "op_Explicit")
+                            {
+                                // skip casts for now
+                                continue;
+                            }
+                            else if (IsUnaryOp(m))
+                            {
+                                // unary operators always(?) take enclosed type as parameter
+                                sb.AppendLine($"{AdjustedTypeName(m.ReturnType)} opUnary(string op:\"{operatorSigns[m.Name]}\")() {{ return MonoOperator!(opUnary!op)(this); }} ");
+                            }
+                            else if (m.Name == "op_Equality" || m.Name == "op_Inequality")
+                            {
+                                // it is just a rewrite to !opEquals() in D
+                                if (m.Name == "op_Inequality")
+                                    continue;
+                                sb.AppendLine($"bool opEquals({AdjustedTypeName(m.GetParameters()[1].ParameterType)} {m.GetParameters()[1].Name}) {{ return MonoOperator!opEquals(this, {m.GetParameters()[1].Name}); }}");
+                            }
+                            else
+                            {
+                                // binary operator
+                                if (m.GetParameters().Length == 2)
+                                {
+                                    bool rightSideOp = m.GetParameters()[0].ParameterType != res;
+                                    if (rightSideOp)
+                                    {
+                                        // right hand variant
+                                        const int i = 0;
+                                        sb.Append($"{AdjustedTypeName(m.ReturnType)} opBinaryRight(string op:\"{operatorSigns[m.Name]}\")(");
+                                        sb.Append($"{(m.GetParameters()[i].IsOut ? "out " : (m.GetParameters()[i].ParameterType.IsByRef ? "ref " : ""))}{(m.GetParameters()[i].ParameterType.IsByRef ? AdjustedTypeName(m.GetParameters()[i].ParameterType.GetElementType()) : AdjustedTypeName(m.GetParameters()[i].ParameterType))} {m.GetParameters()[i].Name})");
+                                    }
+                                    else
+                                    {
+                                        // left hand variant
+                                        const int i = 1;
+                                        sb.Append($"{AdjustedTypeName(m.ReturnType)} opBinary(string op:\"{operatorSigns[m.Name]}\")(");
+                                        sb.Append($"{(m.GetParameters()[i].IsOut ? "out " : (m.GetParameters()[i].ParameterType.IsByRef ? "ref " : ""))}{(m.GetParameters()[i].ParameterType.IsByRef ? AdjustedTypeName(m.GetParameters()[i].ParameterType.GetElementType()) : AdjustedTypeName(m.GetParameters()[i].ParameterType))} {m.GetParameters()[i].Name})");
+                                    }
+                                    sb.Append("{ return MonoOperator!");
+                                    if (rightSideOp)
+                                    {
+                                        sb.Append("(opBinaryRight!op)(");
+                                        appendParamList(m.GetParameters().Reverse().Skip(1).ToArray(), false);
+                                        sb.Append(", this");
+                                    }
+                                    else
+                                    {
+                                        sb.Append("(opBinary!op)(");
+                                        sb.Append("this, ");
+                                        appendParamList(m.GetParameters().Skip(1).ToArray(), false);
+                                    }
+                                    sb.AppendLine("); }");
+                                }
+                            }
+                            
+                        }
+
                         if (m.ContainsGenericParameters || m.IsConstructor || m.IsGenericMethod || m.IsSpecialName)
+                        {
                             continue;
+                        }
+
                         sb.Append($"{(m.IsStatic ? "static " : "")}{AdjustedTypeName(m.ReturnType)} {m.Name}(");
                           for (int i = 0; i < m.GetParameters().Length; i++)
                             sb.Append($"{(m.GetParameters()[i].IsOut ? "out " : (m.GetParameters()[i].ParameterType.IsByRef ? "ref " : ""))}{(m.GetParameters()[i].ParameterType.IsByRef ? AdjustedTypeName(m.GetParameters()[i].ParameterType.GetElementType()) : AdjustedTypeName(m.GetParameters()[i].ParameterType))} {m.GetParameters()[i].Name}{(m.GetParameters()[i].HasDefaultValue ? m.GetParameters()[i].DefaultValue.ToString()  : "")}{(i+1 < m.GetParameters().Length ? ", " : "")}");
@@ -202,6 +306,59 @@ public class EditorReflectionHelperPanel : EditorWindow
     {
         return Aliases.ContainsKey(t) ? Aliases[t] : t.Name;
     }
+
+    static bool IsOperator(string methodName)
+    {
+        return operatorNames.Contains(methodName);
+    }
+
+    static bool IsUnaryOp(MethodInfo mi)
+    {
+        return mi.Name == "op_UnaryPlus"
+            || mi.Name == "op_UnaryNegation"
+            || mi.Name == "op_Increment"
+            || mi.Name == "op_Decrement"
+            || mi.Name == "op_OnesComplement"
+            ;
+    }
+
+    static readonly string[] operatorNames = new string[]
+    {
+        "op_UnaryPlus", "op_UnaryNegation", "op_Increment", "op_Decrement", // + - -- ++
+        "op_Addition", "op_Subtraction", "op_Multiply", "op_Division", "op_Modulus", // + - * / %
+        "op_LeftShift", "op_RightShift", "op_Implicit", "op_Explicit", // << >> opCast opCast
+        "op_BitwiseAnd", "op_BitwiseOr", "op_ExclusiveOr", "op_OnesComplement", // & | ^ ~
+        "op_LogicalNot", "op_Equality", "op_Inequality", "op_True", "op_False", // ! == != opCast(bool) !opCast(bool)
+        "op_LessThan", "op_GreaterThan", "op_LessThanOrEqual", "op_GreaterThanOrEqual", // < > <= >=
+        "Item" // [] aka indexer, not exactly an operator in C#
+    };
+
+    static readonly Dictionary<string, string> operatorSigns =
+    new Dictionary<string, string>()
+    {
+        { "op_UnaryPlus", "+" },
+        { "op_UnaryNegation", "-" },
+        { "op_Increment", "++" },
+        { "op_Decrement", "--" },
+        { "op_Addition", "+" },
+        { "op_Subtraction", "-" },
+        { "op_Multiply", "*" },
+        { "op_Division", "/" },
+        { "op_Modulus", "%" },
+        { "op_LeftShift", "<<" },
+        { "op_RightShift", ">>" },
+        { "op_BitwiseAnd", "&" },
+        { "op_BitwiseOr", "|" },
+        { "op_ExclusiveOr", "^" },
+        { "op_OnesComplement", "~" },
+        { "op_LogicalNot", "!" },
+        { "op_Equality", "==" },
+        { "op_Inequality", "!=" },
+        { "op_LessThan", "<" },
+        { "op_GreaterThan", ">" },
+        { "op_LessThanOrEqual", "<=" },
+        { "op_GreaterThanOrEqual", ">=" },
+    };
 }
 
 class AssemblyNestingComparer : IComparer<Assembly>
