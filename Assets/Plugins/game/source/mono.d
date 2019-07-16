@@ -936,6 +936,257 @@ ReturnType!Method MonoGenericMethod(alias Class, alias Method, Args...)(MonoObje
         return monounwrap!(ReturnType!(Method))(res);
 }
 
+
+/// Implements overloadable operators excluding indexers
+ReturnType!fn MonoOperator(alias fn, U...)(U values) 
+  if (!__traits(identifier, fn).startsWith("opIndex"))
+{
+    alias Class = __traits(parent, TemplateOf!fn);
+    enum op = TemplateArgsOf!fn;
+
+    auto dom = MonoDomainHandle._default.get();
+    MonoAssemblyHandle ass = dom.openAssembly(getAssembly!(Class, "UnityEngine"));
+    auto cls = ass.image.classFromName(getNamespace!(Class), getClassname!(Class));
+
+    static if (U.length == 1) // unary
+    {
+      auto m = mono_class_get_method_from_name(cls.handle, opUnaryNames[op], values.length);
+      auto mmd = mono_method_desc_new(monoMethodDescr!(fn, U).ptr, false);
+    }
+    else static if (U.length == 2) // binary
+    {
+      auto m = mono_class_get_method_from_name(cls.handle, opBinaryNames[op], values.length);
+      auto mmd = mono_method_desc_new(monoMethodDescr!fn.ptr, false);
+    }
+
+    auto mf = mono_method_desc_search_in_class(mmd, cls.handle);
+    mono_method_desc_free(mmd);
+    if (mf)
+        m = mf;
+
+    void*[values.length] args;
+    static foreach(i; 0..values.length)
+    {
+        static if (__traits(hasMember, U[i], "_obj"))
+        args[i] = values[i]._obj;
+        else static if (!isPointer!(typeof(values[i])) && (isBasicType!(typeof(values[i])) || is(typeof(values[i]) == struct)))
+        args[i] = cast(void*) &values[i];
+        else static if (is(typeof(values[i]) == string))
+        args[i] = cast(void*) boxify(values[i]);
+        else
+        args[i] = cast(void*) values[i];
+    }
+    MonoObject* exception;
+    auto res = mono_runtime_invoke(m, null, args.ptr, &exception);
+    if (exception)
+        throw new MonoException(exception);
+    return monounwrap!(ReturnType!fn)(res);
+}
+
+
+/// Implements indexers
+ReturnType!fn MonoOperator(alias fn, U...)(U values) 
+  if (__traits(identifier, fn) == "opIndex" || __traits(identifier, fn) == "opIndexAssign")
+{
+    static if (__traits(identifier, fn) == "opIndexAssign" && !isPointer!(U[0]))
+        static assert(0, "opIndexAssign has no effect due to pass by value, consider passing &this instead");
+
+    alias Class = __traits(parent, fn);
+
+    auto dom = MonoDomainHandle._default.get();
+    MonoAssemblyHandle ass = dom.openAssembly(getAssembly!(Class, "UnityEngine"));
+    auto cls = ass.image.classFromName(getNamespace!(Class), getClassname!(Class));
+    auto m = mono_class_get_method_from_name(cls.handle, "Item", values.length);
+    auto mmd = mono_method_desc_new(monoMethodDescr!(fn, U).ptr, false);
+    auto mf = mono_method_desc_search_in_class(mmd, cls.handle);
+    mono_method_desc_free(mmd);
+    if (mf)
+        m = mf;
+
+    // this block does ugly +1 -1 adjustments because we pass 'this' as parameter
+    void*[values.length] args;
+    static foreach(i; 1..values.length)
+    {
+        static if (__traits(hasMember, U[i], "_obj"))
+        args[i-1] = values[i]._obj;
+        else static if (!isPointer!(typeof(values[i])) && (isBasicType!(typeof(values[i])) || is(typeof(values[i]) == struct)))
+        args[i-1] = cast(void*) &values[i];
+        else static if (is(typeof(values[i]) == string))
+        args[i-1] = cast(void*) boxify(values[i]);
+        else
+        args[i-1] = cast(void*) values[i];
+    }
+    MonoObject* exception;
+    static if (__traits(identifier, fn) == "opIndexAssign")
+    auto res = mono_runtime_invoke(m, cast(MonoObject*)values[0], args.ptr, &exception);
+    else
+    auto res = mono_runtime_invoke(m, cast(MonoObject*)&values[0], args.ptr, &exception);
+
+    if (exception)
+        throw new MonoException(exception);
+    static if (!is(ReturnType!fn == void))
+      return monounwrap!(ReturnType!fn)(res);
+}
+
+
+enum opBinaryNames = [
+    "+" : "op_Addition",
+    "-" : "op_Subtraction",
+    "/" : "op_Division",
+    "*" : "op_Multiply",
+    "%" : "op_Modulus",
+    "&" : "op_BitwiseAnd",
+    "|" : "op_BitwiseOr",
+    "^" : "op_ExclusiveOr",
+    "<<" : "op_LeftShift",
+    ">>" : "op_RightShift",
+    // binary ~ (complement operator) is not overloadable
+];
+
+enum opUnaryNames = [
+    "+" : "op_UnaryPlus",
+    "-" : "op_UnaryNegation",
+    "~" : "op_OnesComplement",
+    "++" : "op_Increment",
+    "--" : "op_Decrement",
+];
+
+
+/// assembly name for user defined type
+enum getAssembly(alias T) = getUDAs!(T, AssemblyAttr)[0].name;
+
+
+/// same, but with custom default
+template getAssembly(alias T, string default_)
+{
+    static if (getUDAs!(T, AssemblyAttr).length)
+        enum getAssembly = getUDAs!(T, AssemblyAttr)[0].name;
+    else 
+        enum getAssembly = default_;
+} 
+
+
+/// Retrieves C# namespace for user defined type
+enum getNamespace(alias T) = getUDAs!(T, NamespaceAttr)[0].name;
+
+
+/// Resulting type name (if rename is present)
+template getClassname(alias T)
+{
+    static if (getUDAs!(T, SymNameAttr).length)
+        enum getClassname = getUDAs!(T, SymNameAttr)[0].name;
+    else
+        enum getClassname = __traits(identifier, T);
+}
+
+
+string monoMethodDescr(alias fn)() 
+  if (is(isSomeFunction!fn))
+{
+    string res;
+    res ~= ":" ~ __traits(identifier, fn) ~ "(";
+    res ~= monoSignatureDescr!fn();
+    res ~= ")";
+    return res;
+}
+
+
+string monoMethodDescr(alias fn)() 
+  if (__traits(identifier, fn).startsWith("opBinary"))
+{
+    string res;
+    res ~= ":" ~ opBinaryNames[TemplateArgsOf!fn[0]] ~ "(";
+    static if (__traits(identifier, fn) == "opBinaryRight")
+    {
+      res ~= monoSignatureTypeName!(Parameters!fn[0]) ~ "," ~ monoSignatureTypeName!(__traits(parent, TemplateOf!fn));
+    }
+    else
+    {
+      res ~= monoSignatureTypeName!(__traits(parent, TemplateOf!fn)) ~ "," ~ monoSignatureTypeName!(Parameters!fn[0]);
+    }
+    res ~= ")";
+    return res;
+}
+
+
+string monoMethodDescr(alias fn, U...)() 
+  if (__traits(identifier, fn) == "opUnary" && U.length == 1)
+{
+    string res;
+    res ~= ":" ~ opUnaryNames[TemplateArgsOf!fn[0]] ~ "(";
+    res ~= monoSignatureTypeName!(U);
+    res ~= ")";
+    return res;
+}
+
+
+string monoMethodDescr(alias fn, U...)() 
+  if (__traits(identifier, fn).startsWith("opIndex"))
+{
+    // U[0] is 'this', so adjust
+    string res;
+    static if (__traits(identifier, fn) == "opIndex")
+      res ~= ":get_Item(";
+    else static if (__traits(identifier, fn) == "opIndexAssign")
+      res ~= ":set_Item(";
+    foreach(i, p; U[1..$])
+    {
+        res ~= monoSignatureTypeName!p();
+        if (i+1 < U.length-1)
+            res ~=",";
+    }
+    res ~= ")";
+    return res;
+}
+
+
+/// assembles parameters specification string
+string monoSignatureDescr(alias fn)()
+{
+    string res;
+    foreach(i, p; Parameters!fn)
+    {
+        res ~= monoSignatureTypeName!p();
+        if (i+1 < Parameters!fn.length)
+            res ~=",";
+    }
+    return res;
+}
+
+
+/// Builds type name for mono method description
+string monoSignatureTypeName(T)()
+{
+    static if (is(T == struct) || is(T == class) || is(T == interface))
+    {
+        auto res = getNamespace!(T);
+        if (res)
+            res ~= ".";
+        res ~= getClassname!(T);
+        return res;
+    }
+    // mono types shortcuts
+    else static if(is(T == char)) return  "char";
+    else static if(is(T == bool)) return  "bool";
+    else static if(is(T == ubyte)) return  "byte";
+    else static if(is(T == byte)) return  "sbyte";
+    else static if(is(T == ushort)) return  "uint16";
+    else static if(is(T == short)) return  "int16";
+    else static if(is(T == uint)) return  "uint";
+    else static if(is(T == int)) return  "int";
+    else static if(is(T == ulong)) return  "ulong";
+    else static if(is(T == long)) return  "long";
+    else static if(is(T == size_t)) return  "uintptr"; // not guaranteed, may or may not match void* size
+    else static if(is(T == void*)) return  "intptr";
+    else static if(is(T == float)) return  "single";
+    else static if(is(T == double)) return  "double";
+    else static if(is(T == string)) return  "string";
+    else static if(is(T == Object)) return  "object";
+    else 
+        static assert(0, "unsupported type");
+}
+
+
 T MonoMemberGet(Class, T, string name)(MonoObject* obj)
 {
     enum assemblyName = getUDAs!(Class, AssemblyAttr)[0].name;
@@ -1193,6 +1444,8 @@ static assert(!hasOverloadWithObjectParam!(Object_, "name"));
                             "}"
                             );
                         }
+                        static if (m == "opIndex" || m == "opIndexAssign") {}
+                        else
                         // actual static method implementation
                         mixin(
                             `pragma(mangle, "`, fn.mangleof, `")`, '\n',
