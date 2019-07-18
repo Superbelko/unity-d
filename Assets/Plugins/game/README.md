@@ -17,10 +17,10 @@ Works:
 - Constructors
 - [Limited] Fields
 - [Limited] Generic Methods
+- [Experimental] Operator overloading
 
 
 Not yet, but may in future:
-- Operator overloads
 - Delegates
 - Events
 
@@ -28,6 +28,7 @@ Unknown:
 - Implement method using native function
 - Native inheritance
 - Ability to create classes that are usable from .NET
+- *There is a chance that all three could be achievable by using runtime code generation (for example with the help of Roslyn-based helper plugin)*
 
 
 ## How it is implemented
@@ -38,6 +39,7 @@ There are several key elements that provides the core functionality
 - `MonoObjectImpl` / `monoObjectImpl` mixins - the former just injects wrapper handle and constructor, the latter also implements all static methods in current class
 - `monoGenericMethod` mixin - implements current templated method as generic
 - `MonoMember(T, string name)` mixin - implements field accessor
+- `MonoOperator(alias op)(...)` - operator overload implementation
 - annotations like `namespace("name")` and `assembly("name")` - used to describe where specific classes can be found
 - `symname("name")` attribute to use with reserved names like `object`
 
