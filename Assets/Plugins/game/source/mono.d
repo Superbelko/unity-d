@@ -365,6 +365,18 @@ const(char)* function(MonoError* error)  mono_error_get_message;
 int function(MonoError* error)  mono_error_ok;
 
 
+T* mono_array_addr(T)(MonoArray* array, size_t index) {
+  return cast(T*)mono_array_addr_with_size(array, T.sizeof, index);
+}
+
+T mono_array_get(T)(MonoArray* array, size_t index) {
+    return *(cast(T*)mono_array_addr!T(array,index));
+}
+
+void mono_array_set(T)(MonoArray* array, size_t index, T value) {
+    T* __p = cast(T*)mono_array_addr!T(array,index); *__p = value;
+}
+
 
 struct Loader
 {
@@ -526,6 +538,75 @@ struct MonoMethodHandle(alias fn)
     }
 }
 
+struct MonoArrayHandle(T)
+{
+    private MonoArray* _arr;
+
+    @property MonoArray* handle() { return _arr; }
+
+    @disable this();
+    // not sure, so non copyable for now
+    @disable this(this) {}
+
+    this(size_t len)
+    {
+        auto dom = MonoDomainHandle.get();
+        MonoClass* arrayClass;
+        static if (is(T == class))
+        {
+          MonoAssemblyHandle ass = dom.openAssembly(getAssembly!(T,"netstandard"));
+          auto cls = ass.image.classFromName(getNamespace!T, getClassname!T);
+          arrayClass = cls.handle;
+        }
+        else static if (is(T == struct))
+        {
+          // untested
+          // TODO: mark assemblies to not assume that all structs is from UnityEngine
+          MonoAssemblyHandle ass = dom.openAssembly(getAssembly!(T,"UnityEngine"));
+          auto cls = ass.image.classFromName(getNamespace!T, getClassname!T);
+          arrayClass = cls.handle;
+        }
+        else
+        {
+          arrayClass = mapType!T();
+        }
+        this(arrayClass, len);
+    }
+
+    this(T[] values)
+    {
+        this(values.length);
+        foreach(i, ref T item; values)
+            this[i] = item;
+    }
+
+    private this(MonoClass* arrayClass, size_t len)
+    {
+        auto dom = MonoDomainHandle.get();
+        _arr = mono_array_new(dom.handle, arrayClass, len);
+    }
+
+    private this(MonoArray* array)
+    {
+        _arr = array;
+    }
+
+    T opIndex(size_t index)
+    {
+        return mono_array_get!(T)(_arr, index);
+    }
+
+    void opIndexAssign(T val, size_t index)
+    {
+        static if(__traits(hasMember, T, "_obj") && is(typeof(val._obj) == MonoObject*))
+          mono_array_set!(MonoObject*)(_arr, index, val._obj);
+        else static if (__traits(hasMember, T, "handle") && is(typeof(val._obj) == MonoObject*))
+          mono_array_set!(MonoObject*)(_arr, index, val.handle);
+        else
+          mono_array_set!T(_arr, index, val);
+    }
+}
+
 
 // types that requires boxing/unboxing
 bool isValueType(T)()
@@ -538,6 +619,7 @@ bool isValueType(T)()
 MonoObject* boxify(T)(T t)
 {
     import std.string : toStringz;
+    import std.range : ElementType;
     static if (is(T : Object) || is(T : MonoObject*))
         return cast(MonoObject*) t;
     else static if (isSomeString!T && !isStaticArray!T)
@@ -546,6 +628,8 @@ MonoObject* boxify(T)(T t)
         return cast(MonoObject*)mono_string_new(mono_domain_get(), t);
     else static if (isSomeFunction!(mapType!T))
         return mono_value_box(mono_domain_get(), mapType!T(), &t);
+    else static if (isArray!T)
+        return cast(MonoObject*) MonoArrayHandle!(ElementType!T)(t).handle;
     else
         static assert(0);
 }
@@ -646,7 +730,7 @@ template MonoImplement(T)
                         args[i] = mixin("_param_", cast(int) i)._obj;
                         else static if (!isPointer!(Parameters!m[i]) && (isBasicType!(Parameters!m[i]) || is(Parameters!m[i] == struct)))
                         args[i] = cast(void*) mixin("&_param_", cast(int) i);
-                        else static if (is(Parameters!m[i] == string))
+                        else static if (is(Parameters!m[i] == string) || isArray!(Parameters!m[i]))
                         args[i] = cast(void*) mixin("_param_", cast(int) i, ".boxify");
                         else
                         args[i] = cast(void*) mixin("_param_", cast(int) i);
@@ -730,7 +814,7 @@ mixin template Fun(T, alias fn, string suffix = null)
                     args[i] = mixin("_param_", cast(int)i)._obj;
                     else static if (!isPointer!(Parameters!fn[i]) && (isBasicType!(Parameters!fn[i]) || is(Parameters!fn[i] == struct)))
                     args[i] = cast(void*) mixin("&_param_", cast(int) i);
-                    else static if (is(Parameters!fn[i] == string))
+                    else static if (is(Parameters!fn[i] == string) || isArray!(Parameters!fn[i]))
                     args[i] = cast(void*) mixin("_param_", cast(int) i, ".boxify");
                     else
                     args[i] = cast(void*) mixin("_param_", cast(int) i);
@@ -883,7 +967,7 @@ ReturnType!Method MonoGenericMethod(alias Class, alias Method, Args...)(MonoObje
             args[i] = mixin("_param_", cast(int) i)._obj;
             else static if (!isPointer!(Parameters!Method[i]) && (isBasicType!(Parameters!Method[i]) || is(Parameters!Method[i] == struct)))
             args[i] = cast(void*) mixin("&_param_", cast(int) i);
-            else static if (is(Parameters!Method[i] == string))
+            else static if (is(Parameters!Method[i] == string) || isArray!(Parameters!Method[i]))
             args[i] = cast(void*) mixin("_param_", cast(int) i, ".boxify");
             else
             args[i] = cast(void*) mixin("_param_", cast(int) i);
@@ -971,7 +1055,7 @@ ReturnType!fn MonoOperator(alias fn, U...)(U values)
         args[i] = values[i]._obj;
         else static if (!isPointer!(typeof(values[i])) && (isBasicType!(typeof(values[i])) || is(typeof(values[i]) == struct)))
         args[i] = cast(void*) &values[i];
-        else static if (is(typeof(values[i]) == string))
+        else static if (is(typeof(values[i]) == string) || isArray!(U[i]))
         args[i] = cast(void*) boxify(values[i]);
         else
         args[i] = cast(void*) values[i];
@@ -1297,7 +1381,10 @@ mixin template MonoMember(T, string name)
 // return System.Type equivalent for specific type
 MonoReflectionType* getSystemType(Class)()
 {
-    enum assemblyName = getUDAs!(Class, AssemblyAttr)[0].name;
+    static if (getUDAs!(Class, AssemblyAttr).length)
+        enum assemblyName = getUDAs!(Class, AssemblyAttr)[0].name;
+    else
+        enum assemblyName = "UnityEngine";
     static if (getUDAs!(Class, NamespaceAttr).length)
         enum nsName = getUDAs!(Class, NamespaceAttr)[0].name;
     else 
@@ -1313,6 +1400,15 @@ MonoReflectionType* getSystemType(Class)()
     auto ty = mono_class_get_type(cls.handle);
     return mono_type_get_object(dom.handle, ty);
 }
+
+
+auto monoTypeOf(Class)()
+{
+    import unity : Type;
+    Type t = new MonoImplement!Type(cast(MonoObject*) getSystemType!Class());
+    return t;
+}
+
 
 version(none) unittest
 {
@@ -1357,6 +1453,11 @@ T monounwrap(T)(MonoObject* value)
     {
         return *(cast(T*) ((cast(void*)value)+MonoObjectSizeOf)); 
     }
+    else static if (is(T == interface))
+    {
+        // implement me
+        return null;
+    }
     else static if (__traits(compiles, new MonoImplement!T(value)))
     {
         return new MonoImplement!T(value);
@@ -1374,10 +1475,27 @@ T monounwrap(T)(MonoObject* value)
     }
     else static if (isArray!T)
     {
-        return null;
+        import std.range : ElementType;
+        auto arr = MonoArrayHandle!(ElementType!T)(cast(MonoArray*) value);
+        const len = mono_array_length(cast(MonoArray*) value);
+        T res = new ElementType!(T)[len];
+        foreach(i; 0..len)
+        {
+            static if (__traits(hasMember, ElementType!T, "_obj") && is(typeof(ElementType!T._obj) == MonoObject*))
+              res[i] = monounwrap!(ElementType!T)(cast(MonoObject*) arr[i]);
+            else static if (is(ElementType!T == struct))
+            {
+              auto tmp = arr[i];
+              res[i] = monounwrap!(ElementType!T)(cast(MonoObject*) &tmp);
+            }
+            else static if (isValueType!(ElementType!T))
+              res[i] = arr[i];
+            else 
+              pragma(msg, __FILE__, ":", __LINE__,  " fix me - ", T.stringof);
+        }
+        return res;
     }
-    else
-        return T.init;
+    else static assert(0);
 }
 
 
@@ -1480,8 +1598,8 @@ static assert(!hasOverloadWithObjectParam!(Object_, "name"));
                                         args[i] = mixin("_param_", cast(int) i)._obj;
                                         else static if (!isPointer!(Parameters!fn[i]) && (isBasicType!(Parameters!fn[i]) || is(Parameters!fn[i] == struct)))
                                         args[i] = cast(void*) mixin("&_param_", cast(int) i);
-                                        else static if (is(Parameters!fn[i] == string))
-                                        args[i] = cast(void*) mixin("_param_", cast(int) i, ".boxify");
+                                        else static if (is(Parameters!fn[i] == string) || isArray!(Parameters!fn[i]))
+                                        args[i] = cast(void*) mixin("boxify(_param_", cast(int) i, ")");
                                         else
                                         args[i] = cast(void*) mixin("_param_", cast(int) i);
                                     }

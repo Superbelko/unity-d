@@ -8,9 +8,26 @@ alias Field = MonoMember;
 enum unityDefaultAssembly = "Assembly-CSharp";
 
 
+@assembly("netstandard")
 @namespace("System")
 {
-    abstract class Type {}
+    abstract class Type 
+    {
+        mixin(monoObjectImpl);
+
+        @property .Assembly Assembly();
+    }
+}
+
+@assembly("netstandard")
+@namespace("System.Reflection")
+{
+    abstract class Assembly 
+    {
+        mixin(monoObjectImpl);
+
+        @property string FullName();
+    }
 }
 
 @namespace("System.Collections")
@@ -571,6 +588,8 @@ enum unityDefaultAssembly = "Assembly-CSharp";
         static float Clamp(float value, float min, float max);
         static float Clamp01(float value);
         static float Lerp(float a, float b, float t);
+        static float Max(float[] values...);
+        static float Max(float a, float b);
     }
 
 
@@ -669,6 +688,7 @@ enum unityDefaultAssembly = "Assembly-CSharp";
         mixin(monoObjectImpl);
 
         this(string name);
+        this(MonoObject* obj) { super(obj); }
 
         @property float bounciness();
         @property void bounciness(float val);
@@ -939,7 +959,9 @@ enum unityDefaultAssembly = "Assembly-CSharp";
     abstract class YieldInstruction {}
 
 
-    abstract class Coroutine : YieldInstruction {}
+    abstract class Coroutine : YieldInstruction {
+        mixin(monoObjectImpl);
+    }
 
 
     abstract class Time 
