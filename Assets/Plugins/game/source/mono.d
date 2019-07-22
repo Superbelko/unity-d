@@ -1390,6 +1390,91 @@ mixin template MonoMember(T, string name)
 
 }
 
+
+
+// NOTE: Resulting MonoClass* should be manually freed after use
+private MonoClass* inflateGenericClass(Args...)(MonoClass* base)
+{
+    import core.stdc.stdlib;
+    import std.conv;
+    import mono_internal;
+    import unity;
+
+    MonoClass* res;
+    MonoObject* exc;
+    MonoError err;
+
+    auto dom = MonoDomainHandle.get();
+    if (base)
+    {
+        MonoType*[Args.length] argtypes;
+        static foreach(i, arg; Args)
+        {
+            // not sure about enums, internally they have storage class (usually int)
+            static if (is(arg == enum))
+            argtypes[i] = mono_class_get_type(mono_get_enum_class());
+            else
+            {
+            mixin("MonoAssemblyHandle assArg", cast(int) i, ";");
+            mixin("assArg", cast(int) i) = dom.openAssembly(getAssembly!(arg, "UnityEngine"));
+            mixin("MonoClassHandle clsArg", cast(int) i, ";");
+            mixin("clsArg", cast(int) i) = mixin("assArg", cast(int)i).image.classFromName(getNamespace!arg, getClassname!arg);
+            argtypes[i] = mono_class_get_type(mixin("clsArg", cast(int) i).handle);
+            }
+        }
+
+        auto gi = cast(_MonoGenericInst*)malloc(_MonoGenericInst.sizeof);
+        gi.id = -1;
+        gi.is_open = 0;
+        gi.type_argc = Args.length;
+        gi.type_argv[0] = cast(MonoType*) argtypes[0];
+        auto ctx = _MonoGenericContext(gi, null);
+        res = mono_type_get_class(
+         mono_class_inflate_generic_type(mono_class_get_type(base), cast(mono.MonoGenericContext*) &ctx)
+        );
+    }
+
+    return res;
+}
+
+version(none)
+{
+alias EventFrom(alias fn) = extern(C) ReturnType!fn function (Parameters!fn);
+
+// C# event wrapper
+struct MonoEventImpl(Class, string eventName, alias del)
+{
+    void Add(EventFrom!del d)
+    {
+        import core.stdc.string;
+        import unity;
+
+        auto dom = MonoDomainHandle.get();
+        MonoAssemblyHandle ass = dom.openAssembly(getAssembly!(Class, "UnityEngine"));
+        auto cls = ass.image.classFromName(getNamespace!Class, getClassname!Class);
+        auto uc = ass.image.classFromName("UnityEngine.Events", "UnityAction");
+        void* it;
+        MonoEvent* e = mono_class_get_events(cls.handle, &it);
+        while(e)
+        {
+            if (e && strcmp(mono_event_get_name(e), eventName.ptr) == 0)
+            {
+                auto addMethod = mono_event_get_add_method(e);
+
+                void*[1] args; 
+                // TODO: bind event somehow
+                MonoObject* exc;
+                mono_runtime_invoke(addMethod, e, args.ptr, &exc);
+                if (exc)
+                    Debug.Log(cast(Object) exc);
+            }
+            e = mono_class_get_events(cls.handle, &it);
+        }
+    }
+}
+} // version (none)
+
+
 // return System.Type equivalent for specific type
 MonoReflectionType* getSystemType(Class)()
 {
