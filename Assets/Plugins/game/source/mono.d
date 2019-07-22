@@ -39,6 +39,7 @@ struct MonoGenericClass;
 struct MonoGenericContext;
 struct MonoImageSet;
 struct MonoEvent;
+struct MonoDelegate;
 struct MonoThread;
 
 alias MonoError = uint;
@@ -73,6 +74,9 @@ static:
     MonoClass* mono_class_from_generic_parameter(MonoGenericParam* param, MonoImage* image, bool is_mvar);
     MonoMethod* mono_class_inflate_generic_method(MonoMethod* method, MonoGenericContext* context);
     MonoMethod* mono_get_inflated_method(MonoMethod *method);
+    MonoType* mono_class_inflate_generic_type_checked(MonoType* type, MonoGenericContext* context, MonoError* error);  // not available in unity
+    MonoClass* mono_class_inflate_generic_class_checked(MonoClass* gklass, MonoGenericContext* context, MonoError* error); // not available in unity
+    MonoType* mono_class_inflate_generic_type(MonoType* type, MonoGenericContext* context);
 
 
     MonoObject* mono_value_box(MonoDomain* domain, MonoClass* klass, void* val);
@@ -231,12 +235,20 @@ void function(MonoAssembly* assembly)  mono_assembly_close;
 const(char)* function(MonoClass* klass)  mono_class_get_namespace;
 MonoClass* function(MonoImage *image, const(char)* name_space, const(char)* name)  mono_class_from_name;
 MonoVTable* function(MonoDomain* domain, MonoClass* klass)  mono_class_vtable;
+MonoClassField* function(MonoClass* klass, void** iter)  mono_class_get_fields;
 MonoMethod* function(MonoClass* klass, void** iter)  mono_class_get_methods;
+MonoProperty* function(MonoClass* klass, void** iter)  mono_class_get_properties;
+MonoEvent* function(MonoClass* klass, void** iter)  mono_class_get_events;
+MonoClass* function(MonoClass* klass, void** iter)  mono_class_get_interfaces;
+MonoClass* function(MonoClass* klass, void** iter)  mono_class_get_nested_types;
 MonoType* function(MonoClass* klass)  mono_class_get_type;
 MonoProperty* function(MonoClass* klass, const(char)* name)  mono_class_get_property_from_name;
 MonoClassField* function(MonoClass* klass, const(char)* name)  mono_class_get_field_from_name;
 MonoMethod* function(MonoClass* klass, const(char)* name, int param_count)  mono_class_get_method_from_name;
 MonoMethod* function(MonoMethod* method, MonoGenericContext* context)  mono_class_inflate_generic_method;
+MonoType* function(MonoType* type, MonoGenericContext* context, MonoError* error)  mono_class_inflate_generic_type_checked;
+//MonoClass* function(MonoClass* gklass, MonoGenericContext* context, MonoError* error)  mono_class_inflate_generic_class_checked; // not present in unity mono
+MonoType* function(MonoType* type, MonoGenericContext* context)  mono_class_inflate_generic_type;
 
 MonoObject* function(MonoDomain* domain, MonoClass* klass, void* val)   mono_value_box;
 void function(void* dest, const void* src, MonoClass *klass)  mono_value_copy;
