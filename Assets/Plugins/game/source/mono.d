@@ -717,23 +717,10 @@ template MonoImplement(T)
                     import std.algorithm;
                     import std.array;
                     import std.conv : to;
-                    //mixin("super(", paramSeq(Parameters!m.length), ");");
-
-                    static if (getUDAs!(T, AssemblyAttr).length)
-                      enum assemblyName = getUDAs!(T, AssemblyAttr)[0].name;
-                    else
-                      enum assemblyName = "UnityEngine";
-                    static if (getUDAs!(T, NamespaceAttr).length)
-                      string namespace = getUDAs!(T, NamespaceAttr)[0].name;
-                    else
-                      string namespace = "";
-                    static if (getUDAs!(T, SymNameAttr).length)
-                      enum clsName = getUDAs!(T, SymNameAttr)[0].name;
-                    else
-                      enum clsName = __traits(identifier, T);
+                    
                     auto dom = MonoDomainHandle.get();
-                    auto ass = dom.openAssembly(assemblyName);
-                    MonoClassHandle cls = ass.image.classFromName(namespace, T.stringof == "Object_" ? "Object" : clsName );
+                    auto ass = dom.openAssembly(getAssembly!(T, "UnityEngine"));
+                    MonoClassHandle cls = ass.image.classFromName(getNamespace!T, getClassname!T);
                     auto meth = mono_class_get_method_from_name(cls.handle, ".ctor", Parameters!m.length);
                     void*[Parameters!m.length] args;
                     static foreach(i; 0..args.length)
@@ -792,21 +779,9 @@ mixin template Fun(T, alias fn, string suffix = null)
     mixin(
         __traits(identifier, fn) == "__ctor" ? "this " : text(`final`, __traits(isStaticFunction, fn) ? " static " : (is(T==struct) ? " " : " override "), `ReturnType!fn `, __traits(identifier, fn)), suffix, `(Parameters!fn)`,
         q{{
-                static if (getUDAs!(__traits(parent, fn), AssemblyAttr).length)
-                  enum assembly = getUDAs!(__traits(parent, fn), AssemblyAttr)[0].name;
-                else
-                  enum assembly = "UnityEngine";
-                static if (getUDAs!(__traits(parent, fn), NamespaceAttr).length)
-                  string namespace = getUDAs!(__traits(parent, fn), NamespaceAttr)[0].name;
-                else
-                  string namespace = "";
-                static if (getUDAs!(__traits(parent, fn), SymNameAttr).length)
-                  enum clsName = getUDAs!(__traits(parent, fn), SymNameAttr)[0].name;
-                else
-                  enum clsName = __traits(identifier, __traits(parent, fn));
                 auto dom = MonoDomainHandle.get();
-                auto ass = dom.openAssembly(assembly);
-                MonoClassHandle cls = ass.image.classFromName(namespace, __traits(identifier, __traits(parent, fn)) == "Object_" ? "Object" : clsName);
+                auto ass = dom.openAssembly(getAssembly!(__traits(parent,fn), "UnityEngine"));
+                MonoClassHandle cls = ass.image.classFromName(getNamespace!(__traits(parent, fn)), getClassname!(__traits(parent, fn)));
                 static if (staticIndexOf!("@property", __traits(getFunctionAttributes, FunctionTypeOf!(fn))) >= 0)
                   static if (Parameters!(FunctionTypeOf!fn).length == 1)
                     auto m = mono_property_get_set_method(mono_class_get_property_from_name(cls.handle, __traits(identifier, fn)));
@@ -1163,7 +1138,13 @@ template getAssembly(alias T, string default_)
 
 
 /// Retrieves C# namespace for user defined type
-enum getNamespace(alias T) = getUDAs!(T, NamespaceAttr)[0].name;
+template getNamespace(alias T)
+{
+    static if (hasUDA!(T, NamespaceAttr))
+        enum getNamespace = getUDAs!(T, NamespaceAttr)[0].name;
+    else
+        enum getNamespace = "";
+}
 
 
 /// Resulting type name (if rename is present)
@@ -1666,21 +1647,9 @@ static assert(!hasOverloadWithObjectParam!(Object_, "name"));
                             `pragma(mangle, "`, fn.mangleof, `")`, "\n",
                             `final`, __traits(isStaticFunction, fn) ? " static " : (is(typeof(this) == struct) ? " " : " override "), (ReturnType!fn).stringof, " ", __traits(identifier, fn), `_Impl (Parameters!fn)`, 
                             q{{
-                                    static if (getUDAs!(typeof(this), AssemblyAttr).length)
-                                      enum assemblyName = getUDAs!(typeof(this), AssemblyAttr)[0].name;
-                                    else
-                                      enum assemblyName = "UnityEngine";
-                                    static if (getUDAs!(__traits(parent, fn), NamespaceAttr).length)
-                                      string namespace = getUDAs!(__traits(parent, fn), NamespaceAttr)[0].name;
-                                    else
-                                      string namespace = "";
-                                    static if (getUDAs!(__traits(parent, fn), SymNameAttr).length)
-                                      enum clsName = getUDAs!(__traits(parent, fn), SymNameAttr)[0].name;
-                                    else
-                                      enum clsName = __traits(identifier, __traits(parent, fn));
                                     auto dom = MonoDomainHandle.get();
-                                    auto ass = dom.openAssembly(assemblyName);
-                                    MonoClassHandle cls = ass.image.classFromName(namespace, __traits(identifier, __traits(parent, fn)) == "Object_" ? "Object" : clsName);
+                                    auto ass = dom.openAssembly(getAssembly!(__traits(parent, fn), "UnityEngine"));
+                                    MonoClassHandle cls = ass.image.classFromName(getNamespace!(__traits(parent, fn)), getClassname!(__traits(parent, fn)));
                                     static if (-1 != staticIndexOf!("@property", __traits(getFunctionAttributes, FunctionTypeOf!(fn))))
                                     static if (is(typeof(return) == void))
                                         auto m = mono_property_get_set_method(mono_class_get_property_from_name(cls.handle, __traits(identifier, fn)));
