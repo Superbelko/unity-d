@@ -564,7 +564,11 @@ struct MonoArrayHandle(T)
     {
         auto dom = MonoDomainHandle.get();
         MonoClass* arrayClass;
-        static if (is(T == class))
+        static if (is(T == Object))
+        {
+          arrayClass = mono_get_object_class();
+        }
+        else static if (is(T == class))
         {
           MonoAssemblyHandle ass = dom.openAssembly(getAssembly!(T,"netstandard"));
           auto cls = ass.image.classFromName(getNamespace!T, getClassname!T);
@@ -1372,88 +1376,171 @@ mixin template MonoMember(T, string name)
 }
 
 
-
-// NOTE: Resulting MonoClass* should be manually freed after use
-private MonoClass* inflateGenericClass(Args...)(MonoClass* base)
+ReturnType!fn MonoMethodImpl(Class, alias fn, T...)(auto ref Class this_, T args) if (isSomeFunction!fn && !__traits(isTemplate, fn))
 {
-    import core.stdc.stdlib;
-    import std.conv;
-    import mono_internal;
-    import unity;
-
-    MonoClass* res;
-    MonoObject* exc;
-    MonoError err;
-
     auto dom = MonoDomainHandle.get();
-    if (base)
-    {
-        MonoType*[Args.length] argtypes;
-        static foreach(i, arg; Args)
-        {
-            // not sure about enums, internally they have storage class (usually int)
-            static if (is(arg == enum))
-            argtypes[i] = mono_class_get_type(mono_get_enum_class());
-            else
-            {
-            mixin("MonoAssemblyHandle assArg", cast(int) i, ";");
-            mixin("assArg", cast(int) i) = dom.openAssembly(getAssembly!(arg, "UnityEngine"));
-            mixin("MonoClassHandle clsArg", cast(int) i, ";");
-            mixin("clsArg", cast(int) i) = mixin("assArg", cast(int)i).image.classFromName(getNamespace!arg, getClassname!arg);
-            argtypes[i] = mono_class_get_type(mixin("clsArg", cast(int) i).handle);
-            }
-        }
+    auto ass = dom.openAssembly(getAssembly!(Class, "UnityEngine"));
+    MonoClassHandle cls = ass.image.classFromName(getNamespace!Class, getClassname!Class);
 
-        auto gi = cast(_MonoGenericInst*)malloc(_MonoGenericInst.sizeof);
-        gi.id = -1;
-        gi.is_open = 0;
-        gi.type_argc = Args.length;
-        gi.type_argv[0] = cast(MonoType*) argtypes[0];
-        auto ctx = _MonoGenericContext(gi, null);
-        res = mono_type_get_class(
-         mono_class_inflate_generic_type(mono_class_get_type(base), cast(mono.MonoGenericContext*) &ctx)
-        );
+    // --- method picker
+    static if (staticIndexOf!("@property", __traits(getFunctionAttributes, FunctionTypeOf!(fn))) >= 0)
+      static if (Parameters!(FunctionTypeOf!fn).length == 1)
+        auto m = mono_property_get_set_method(mono_class_get_property_from_name(cls.handle, __traits(identifier, fn)));
+      else static if (Parameters!(FunctionTypeOf!fn).length == 0)
+        auto m = mono_property_get_get_method(mono_class_get_property_from_name(cls.handle, __traits(identifier, fn)));
+      else 
+        static assert(0, "invalid parameters for @property");
+    else
+      static if (__traits(identifier, fn) == "__ctor")
+        auto m = mono_class_get_method_from_name(cls.handle, ".ctor", Parameters!fn.length);
+    else
+      auto m = mono_class_get_method_from_name(cls.handle, __traits(identifier, fn), Parameters!fn.length);
+
+    // --- extract as params packer
+    void*[Parameters!fn.length] fnargs;
+    static foreach(i; 0..fnargs.length)
+    {
+        static if (__traits(hasMember, Parameters!fn[i], "_obj"))
+        fnargs[i] = mixin("_param_", cast(int)i+1)._obj;
+        else static if (!isPointer!(Parameters!fn[i]) && (isBasicType!(Parameters!fn[i]) || is(Parameters!fn[i] == struct)))
+        fnargs[i] = cast(void*) mixin("&_param_", cast(int) i+1);
+        else static if (is(Parameters!fn[i] == string) || isArray!(Parameters!fn[i]))
+        fnargs[i] = cast(void*) mixin("_param_", cast(int) i+1, ".boxify");
+        else
+        fnargs[i] = cast(void*) mixin("_param_", cast(int) i+1);
     }
 
-    return res;
+    // --- static/virtual selector
+    static if (__traits(isStaticFunction, fn))
+      MonoObject* self = null;
+    else static if (__traits(identifier, fn) == "__ctor")
+      MonoObject* self = mono_object_new(dom.handle, cls.handle);
+    else static if (is(T==struct))
+      MonoObject* self = cast(MonoObject*) &this_;
+    else
+      { MonoObject* self = this_._obj; m = mono_object_get_virtual_method(self, m); }
+    
+    // --- actual call
+    MonoObject* exception;
+    auto res = mono_runtime_invoke(m, self, fnargs.ptr, &exception);
+    static if (__traits(identifier, fn) == "__ctor")
+        this_.__ctor(res);
+    if (exception)
+        throw new MonoException(exception);
+    static if (!(is(typeof(return) == void) || __traits(identifier, fn) == "__ctor"))
+        return monounwrap!(ReturnType!(FunctionTypeOf!fn))(res);
 }
 
-version(none)
+
+private auto inflateGenericClass(Args...)(MonoClass* base)
 {
+    import unity;
+
+    auto dom = MonoDomainHandle.get();
+
+    auto ty = mono_class_get_type(base);
+    Type type = new MonoImplement!Type(cast(MonoObject*) mono_type_get_object(dom.handle, ty));
+    Type[Args.length] genericParams;
+    static foreach(i, arg; Args)
+    {
+        genericParams[i] = monoTypeOf!arg;
+    }
+    auto genericType = type.MakeGenericType(genericParams);
+
+    // MonoClass* can be obtained using Type.TypeHandle.Value property
+    return genericType;
+}
+
+
 alias EventFrom(alias fn) = extern(C) ReturnType!fn function (Parameters!fn);
 
 // C# event wrapper
 struct MonoEventImpl(Class, string eventName, alias del)
 {
-    void Add(EventFrom!del d)
+    auto Add(EventFrom!del d, MonoObject* inst = null)
     {
-        import core.stdc.string;
+        return doIt(inst, d, mono_event_get_add_method);
+    }
+
+    void Remove(MonoObject* del, MonoObject* inst = null)
+    {
+        doIt(inst, del, mono_event_get_remove_method);
+    }
+
+    private MonoObject* doIt(MonoObject* inst, void* theDelegate, typeof(mono_event_get_add_method) eventAction)
+    {
+        import std.conv : to;
+        import std.string : format;
         import unity;
+
+        enum isGenericDel = __traits(compiles, TemplateArgsOf!del);
 
         auto dom = MonoDomainHandle.get();
         MonoAssemblyHandle ass = dom.openAssembly(getAssembly!(Class, "UnityEngine"));
         auto cls = ass.image.classFromName(getNamespace!Class, getClassname!Class);
-        auto uc = ass.image.classFromName("UnityEngine.Events", "UnityAction");
+
+        MonoEvent* e = findEvent(cls.handle, eventName);
+        if (!e)
+            throw new Exception(format("Event '%s' not found in class '%s'", eventName, __traits(identifier, Class)));
+
+        // constructs class name for regular/generic names in form such as List`1 or IList
+        static if (isGenericDel)
+            enum classNameDel = getClassname!del ~ "`" ~ to!string(TemplateArgsOf!del.length);
+        else
+            enum classNameDel = getClassname!del;
+
+        MonoAssemblyHandle delegateAssembly = dom.openAssembly(getAssembly!(del, "UnityEngine"));
+        auto delegateClass = delegateAssembly.image.classFromName(getNamespace!del, classNameDel);
+
+        Type delegateType;
+        static if (isGenericDel)
+        {
+            delegateType = inflateGenericClass!(TemplateArgsOf!del)(delegateClass.handle);
+        }
+        else
+        {
+            delegateType = new MonoImplement!Type(cast(MonoObject*)delegateClass.handle);
+        }
+
+        if (!(delegateType && delegateType._obj))
+            throw new Exception("delegate type error");
+
+        //Debug.Log(cast(Object) delegateType._obj);
+
+        void*[1] args = [ theDelegate ];
+
+        if (eventAction == mono_event_get_add_method)
+        {
+            // delegates implicitly derived from Delegate class, and have constructor that takes context and method parameters
+            auto fnptr = mono_value_box(mono_domain_get(), mono_get_intptr_class(), &theDelegate);
+            auto dlg = Activator.CreateInstance(delegateType, [cast(Object) inst, cast(Object) fnptr]);
+            args[0] = dlg;
+        }
+
+        MonoObject* exc;
+        mono_runtime_invoke(eventAction(e), inst, args.ptr, &exc);
+        if (exc)
+            throw new MonoException(exc);
+
+        if (eventAction == mono_event_get_add_method)
+            return cast(MonoObject*) args[0];
+        return null;
+    }
+
+    static MonoEvent* findEvent(MonoClass* cls, string event)
+    {
+        import core.stdc.string;
         void* it;
-        MonoEvent* e = mono_class_get_events(cls.handle, &it);
+        MonoEvent* e = mono_class_get_events(cls, &it);
         while(e)
         {
             if (e && strcmp(mono_event_get_name(e), eventName.ptr) == 0)
-            {
-                auto addMethod = mono_event_get_add_method(e);
-
-                void*[1] args; 
-                // TODO: bind event somehow
-                MonoObject* exc;
-                mono_runtime_invoke(addMethod, e, args.ptr, &exc);
-                if (exc)
-                    Debug.Log(cast(Object) exc);
-            }
-            e = mono_class_get_events(cls.handle, &it);
+                return e;
+            e = mono_class_get_events(cls, &it);
         }
+        return null;
     }
 }
-} // version (none)
 
 
 // return System.Type equivalent for specific type
