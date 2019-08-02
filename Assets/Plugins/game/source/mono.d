@@ -1513,7 +1513,7 @@ struct MonoEventImpl(Class, string eventName, alias del)
         {
             // delegates implicitly derived from Delegate class, and have constructor that takes context and method parameters
             auto fnptr = mono_value_box(mono_domain_get(), mono_get_intptr_class(), &theDelegate);
-            auto dlg = Activator.CreateInstance(delegateType, [cast(Object) inst, cast(Object) fnptr]);
+            auto dlg = Activator.CreateInstance(delegateType, [null, cast(Object) fnptr]);
             args[0] = dlg;
         }
 
