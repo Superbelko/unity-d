@@ -104,8 +104,17 @@ class NativeLoader : MonoBehaviour
 
     private GCHandle _objhandle;
 
+    private static NativeLoader instance;
+
     private void Awake()
     {
+        if (instance != null && instance.plugin.PluginName == plugin.PluginName)
+        {
+            Destroy(this.gameObject);
+            return;
+        }
+        DontDestroyOnLoad(this.gameObject);
+        instance = this;
         LoadPlugin();
         InitPlugin();
         SceneManager.sceneLoaded += OnSceneLoaded;
