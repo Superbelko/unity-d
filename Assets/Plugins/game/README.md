@@ -18,11 +18,8 @@ Works:
 - [Limited] Fields
 - [Limited] Generic Methods
 - [Experimental] Operator overloading
-
-
-Not yet, but may in future:
-- Delegates
-- Events
+- [Experimental (Internal a.t.m.)] Generic Classes
+- [Experimental] Delegates/Events
 
 Unknown: 
 - Implement method using native function
@@ -40,6 +37,7 @@ There are several key elements that provides the core functionality
 - `monoGenericMethod` mixin - implements current templated method as generic
 - `MonoMember(T, string name)` mixin - implements field accessor
 - `MonoOperator(alias op)(...)` - operator overload implementation
+- `MonoEventImpl(Class, string name, alias del)` - event implementation, takes extern(C) function
 - annotations like `namespace("name")` and `assembly("name")` - used to describe where specific classes can be found
 - `symname("name")` attribute to use with reserved names like `object`
 
