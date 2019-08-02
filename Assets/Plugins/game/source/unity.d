@@ -8,6 +8,16 @@ alias Field = MonoMember;
 enum unityDefaultAssembly = "Assembly-CSharp";
 
 
+
+@assembly("netstandard")
+@namespace("System")
+struct RuntimeTypeHandle
+{
+    mixin(monoObjectImpl);
+
+    @property void* Value();
+}
+
 @assembly("netstandard")
 @namespace("System")
 {
@@ -16,7 +26,20 @@ enum unityDefaultAssembly = "Assembly-CSharp";
         mixin(monoObjectImpl);
 
         @property .Assembly Assembly();
+        @property RuntimeTypeHandle TypeHandle();
+
+        Type MakeGenericType(Type[] typeArguments);
     }
+}
+
+@assembly("netstandard")
+@namespace("System")
+abstract class Activator
+{
+    mixin(monoObjectImpl);
+
+    static void* CreateInstance(Type type);
+    static void* CreateInstance(Type type, Object[] args);
 }
 
 @assembly("netstandard")
@@ -950,12 +973,6 @@ enum unityDefaultAssembly = "Assembly-CSharp";
     }
 
 
-    struct Scene
-    {
-        @property int handle();
-    }
-
-
     abstract class YieldInstruction {}
 
 
@@ -1403,6 +1420,46 @@ enum unityDefaultAssembly = "Assembly-CSharp";
         @property void time(float val);
 
         void Clear();
+    }
+}
+
+@assembly("UnityEngine")
+@namespace("UnityEngine.SceneManagement")
+struct Scene
+{
+    mixin (monoObjectImpl);
+    
+    int id;
+    
+    @property int handle();
+
+    @property string path();
+    @property string name();
+    @property void name(string val);
+}
+
+@assembly("UnityEngine")
+@namespace("UnityEngine.Events")
+{
+    extern(C) void UnityAction(T0, T1)(T0 arg0, T1 arg1);
+}
+
+@assembly("UnityEngine")
+@namespace("UnityEngine.SceneManagement")
+enum LoadSceneMode
+{
+    Single = 0,
+    Additive = 1
+}
+
+@assembly("UnityEngine")
+@namespace("UnityEngine.SceneManagement")
+{
+    abstract class SceneManager
+    {
+        mixin(monoObjectImpl);
+
+        static MonoEventImpl!(SceneManager, "sceneLoaded", UnityAction!(Scene, LoadSceneMode)) sceneLoaded;
     }
 }
 
