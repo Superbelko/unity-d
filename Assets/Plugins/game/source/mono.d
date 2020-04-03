@@ -900,7 +900,7 @@ string monoGenericMethod(Args...)()
       str ~= "import " ~ moduleName!arg ~ ";\n";
     str ~= "bool __anchor__;\n";
     str ~= "alias tmpl = __traits(parent, __anchor__);\n";
-    str ~= "alias fn = tmpl!" ~ Args.stringof ~ ";";
+    str ~= "alias fn = tmpl!(" ~ Args.stringof ~ ");";
 
     str ~= "enum fname = __traits(identifier, fn);\n";
     str ~= q{
@@ -1660,7 +1660,7 @@ T monounwrap(T)(MonoObject* value)
         }
         return res;
     }
-    else static assert(0);
+    else static assert(0, "unsupported type: " ~ T.stringof);
 }
 
 
